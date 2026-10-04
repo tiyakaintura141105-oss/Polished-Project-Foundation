@@ -126,6 +126,8 @@ test("Future Me summarizes sparse calorie, sleep, feeling and experiment data fr
   assert.equal(projection.sleep.average, 455);
   assert.equal(projection.feelings.loggedDays, 2);
   assert.equal(projection.feelings.mostLogged, "tired");
+  assert.equal(projection.energy.completedActions, 0);
+  assert.equal(projection.energy.completedActionDays, 0);
   assert.equal(projection.experiments.checkins, 1);
   assert.equal(projection.experiments.completed, 1);
   assert.equal(projection.experiments.averageRating, 4);
@@ -149,6 +151,36 @@ test("Future Me excludes out-of-range measurements and records missing values as
   assert.equal(projection.calories.average, 0);
   assert.equal(projection.energy.loggedDays, 1);
   assert.equal(projection.energy.average, 70);
+});
+
+test("Future Me counts completed energy actions as recorded days, but ignores uncompleted choices", () => {
+  const entries = [
+    entry("energy", "2026-10-02", {
+      level: 30,
+      action: "A five-minute walk",
+      completed: true,
+    }, 1),
+    entry("energy", "2026-10-02", {
+      level: 50,
+      action: "A short outdoor walk",
+      completed: true,
+    }, 2),
+    entry("energy", "2026-10-03", {
+      level: 10,
+      action: "A breathing reset",
+      completed: false,
+    }, 3),
+  ];
+  const projection = futureMeProjection(entries, "2026-10-04", 7);
+  assert.equal(projection.observedDays, 1);
+  assert.equal(projection.projectedRecordDays7, 1);
+  assert.equal(projection.energy.completedActions, 2);
+  assert.equal(projection.energy.completedActionDays, 1);
+  assert.deepEqual(loggingConsistency(entries, 7, "2026-10-04"), {
+    loggedDays: 1,
+    totalDays: 7,
+    percent: 14,
+  });
 });
 
 test("incomplete and missing dates remain missing rather than being fabricated as zero", () => {
@@ -193,6 +225,10 @@ test("sleep shortfall uses logged reference targets and safely handles absent da
     referenceTargetMinutes: 480,
     estimatedDebtMinutes: 0,
     bedtimeVariationMinutes: null,
+    trend: Array.from({ length: 7 }, (_, index) => ({
+      date: addCalendarDays("2026-09-28", index),
+      value: null,
+    })),
   });
   const oneNight = entry("sleep", "2026-10-04", {
     bedtime: "23:00",
@@ -201,8 +237,101 @@ test("sleep shortfall uses logged reference targets and safely handles absent da
     quality: 3,
     referenceTargetMinutes: 420,
   });
-  assert.equal(sleepSummary([oneNight], 7, "2026-10-04").estimatedDebtMinutes, 60);
-  assert.equal(sleepSummary([oneNight], 7, "2026-10-04").averageMinutes, 360);
+  const summary = sleepSummary([oneNight], 7, "2026-10-04");
+  assert.equal(summary.estimatedDebtMinutes, 60);
+  assert.equal(summary.averageMinutes, 360);
+  assert.equal(summary.referenceTargetMinutes, 420);
+  assert.equal(summary.trend[6].value, 360);
+  assert.equal(summary.trend[5].value, null);
+});
+
+test("sleep recovery uses the selected reference and logged naps without crediting missing nights", () => {
+  const night = entry("sleep", "2026-10-04", {
+    bedtime: "23:00",
+    wakeTime: "05:00",
+    durationMinutes: 360,
+    napMinutes: 30,
+    quality: 3,
+    referenceTargetMinutes: 480,
+  });
+  const summary = sleepSummary([night], 7, "2026-10-04", 390);
+  assert.equal(summary.referenceTargetMinutes, 390);
+  assert.equal(summary.estimatedDebtMinutes, 0);
+  assert.equal(summary.loggedNights, 1);
+  assert.equal(summary.averageMinutes, 360);
+  assert.equal(summary.trend.filter((day) => day.value !== null).length, 1);
+});
+
+test("sleep recovery ignores invalid durations, malformed naps, and duplicate dates", () => {
+  const invalid = [
+    entry("sleep", "2026-10-01", {
+      bedtime: "25:99",
+      wakeTime: "07:00",
+      durationMinutes: 0,
+      napMinutes: 600,
+      quality: 4,
+    }, 1),
+    entry("sleep", "2026-10-02", {
+      bedtime: "23:00",
+      wakeTime: "06:00",
+      durationMinutes: 1_500,
+      quality: 4,
+    }, 2),
+    entry("sleep", "2026-10-03", {
+      bedtime: "23:00",
+      wakeTime: "06:00",
+      durationMinutes: 420,
+      napMinutes: -30,
+      quality: 4,
+    }, 3),
+  ];
+  const summary = sleepSummary(invalid, 7, "2026-10-04", 480);
+  assert.equal(summary.loggedNights, 1);
+  assert.equal(summary.averageMinutes, 420);
+  assert.equal(summary.estimatedDebtMinutes, 60);
+  assert.equal(summary.bedtimeVariationMinutes, null);
+  assert.equal(summary.trend.filter((day) => day.value !== null).length, 1);
+
+  const duplicateDate = [
+    entry("sleep", "2026-10-04", {
+      bedtime: "23:00",
+      wakeTime: "05:00",
+      durationMinutes: 360,
+      quality: 3,
+    }, 4),
+    {
+      ...entry("sleep", "2026-10-04", {
+        bedtime: "23:00",
+        wakeTime: "06:00",
+        durationMinutes: 420,
+        quality: 4,
+      }, 5),
+      updatedAt: "2026-10-04T13:00:00.000Z",
+    },
+  ];
+  const deduped = sleepSummary(duplicateDate, 7, "2026-10-04", 480);
+  assert.equal(deduped.loggedNights, 1);
+  assert.equal(deduped.averageMinutes, 420);
+  assert.equal(deduped.estimatedDebtMinutes, 60);
+});
+
+test("sleep bedtime consistency handles crossing midnight and invalid targets safely", () => {
+  const nights = [
+    entry("sleep", "2026-10-03", {
+      bedtime: "23:50",
+      wakeTime: "07:00",
+      durationMinutes: 420,
+      quality: 4,
+    }, 1),
+    entry("sleep", "2026-10-04", {
+      bedtime: "00:10",
+      wakeTime: "07:10",
+      durationMinutes: 420,
+      quality: 4,
+    }, 2),
+  ];
+  assert.equal(sleepSummary(nights, 7, "2026-10-04", 3).referenceTargetMinutes, 480);
+  assert.equal(sleepSummary(nights, 7, "2026-10-04").bedtimeVariationMinutes, 20);
 });
 
 test("feeling and sleep observations require enough matched days and never imply causation", () => {
@@ -242,6 +371,8 @@ test("logging consistency counts unique logged calendar days and energy suggesti
     entry("steps", "2026-10-04", { count: 100 }, 1),
     entry("sleep", "2026-10-04", { durationMinutes: 480 }, 2),
     entry("feeling", "2026-10-02", { feeling: "good", intensity: 7 }, 3),
+    entry("energy", "2026-10-02", { level: 10, action: "A breath", completed: true }, 4),
+    entry("energy", "2026-10-03", { level: 30, action: "A walk", completed: false }, 5),
   ];
   assert.deepEqual(loggingConsistency(entries, 7, "2026-10-04"), {
     loggedDays: 2,
@@ -249,6 +380,9 @@ test("logging consistency counts unique logged calendar days and energy suggesti
     percent: 29,
   });
   assert.match(energyAction(10), /gentle/);
+  assert.match(energyAction(30), /five-minute/i);
+  assert.match(energyAction(50), /10 minutes/i);
+  assert.match(energyAction(70), /15/i);
   assert.match(energyAction(90), /comfortable|movement|walk|experiment/i);
   assert.equal(localDay(new Date(2026, 9, 4)), "2026-10-04");
 });

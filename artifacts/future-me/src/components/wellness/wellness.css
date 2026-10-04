@@ -235,6 +235,49 @@
 .future-pattern-grid .well-card:nth-child(2) { animation-delay:.07s; }
 .future-pattern-grid .well-card:nth-child(3) { animation-delay:.14s; }
 .future-pattern-grid .well-card p { margin:9px 0 0; color:#788b7d; font-size:10px; line-height:1.65; }
+.sleep-top-grid { align-items:stretch; }
+.sleep-summary-lead { display:grid; gap:5px; margin:0 0 13px; padding:13px 14px; border:1px solid #e4ebdd; border-radius:13px; background:#f4f7ee; }
+.sleep-summary-lead span { color:#829384; font-size:9px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+.sleep-summary-lead strong { color:#4c6d56; font:600 15px/1.45 var(--app-font-display,sans-serif); }
+.sleep-data-grid { gap:7px; }
+.sleep-data-grid .well-data-cell { padding:11px 10px; }
+.sleep-data-grid .well-data-cell strong { font-size:16px; }
+.sleep-trend-section,.sleep-goal-section,.energy-history-section { margin-top:28px; }
+.sleep-trend-card { background:linear-gradient(160deg,#fbfdf8,#f4f7ef); }
+.sleep-trend-chart { height:174px; display:flex; align-items:stretch; gap:10px; padding:10px 4px 0; }
+.sleep-trend-day { min-width:0; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px; }
+.sleep-trend-value { min-height:12px; color:#77907d; font-size:8px; white-space:nowrap; }
+.sleep-trend-track { width:min(31px,72%); flex:1; display:flex; align-items:flex-end; overflow:hidden; border-radius:9px 9px 4px 4px; background:rgba(224,233,216,.62); }
+.sleep-trend-track i { display:block; width:100%; min-height:5px; border-radius:inherit; background:linear-gradient(180deg,#a7bc96,#6f967b); transition:height .35s cubic-bezier(.2,.7,.25,1); }
+.sleep-trend-day.is-blank .sleep-trend-track { border:1px dashed #d5e1d3; background:rgba(248,250,246,.45); }
+.sleep-trend-day.is-blank .sleep-trend-track i { display:none; }
+.sleep-trend-day small { color:#91a094; font-size:8px; }
+.sleep-goal-card { background:#f7f7ee; border-color:#e7e8d9; }
+.sleep-goal-intro { margin:0 0 13px; color:#4b6d55; font:600 18px/1.4 var(--app-font-display,sans-serif); letter-spacing:-.02em; }
+.sleep-suggestion-list { display:grid; gap:9px; margin:0; padding:0 0 0 18px; color:#798b7b; font-size:10px; line-height:1.55; }
+.sleep-suggestion-list li::marker { color:#8ba789; }
+.sleep-disclaimer { margin:12px 0 0; color:#87968a; font-size:9px; line-height:1.6; }
+.energy-question { margin:-7px 0 15px; color:#3d604b; font:600 21px/1.25 var(--app-font-display,sans-serif); letter-spacing:-.035em; }
+.energy-philosophy { margin:13px 0 0; color:#688473; font:500 12px var(--app-font-display,sans-serif); }
+.energy-consistency { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin:3px 0 13px; }
+.energy-consistency strong { color:#426950; font:600 25px var(--app-font-display,sans-serif); letter-spacing:-.04em; }
+.energy-consistency span { color:#829286; font-size:9px; }
+.energy-week { display:flex; gap:8px; padding:12px 3px 5px; border-top:1px solid #e5ece2; }
+.energy-week-day { min-width:0; flex:1; display:grid; justify-items:center; gap:6px; color:#a1ada3; }
+.energy-week-day > span { width:29px; height:29px; display:grid; place-items:center; border:1px dashed #d9e3d8; border-radius:50%; color:transparent; background:#f8faf6; }
+.energy-week-day.is-logged > span { border-style:solid; border-color:#d0e1d0; color:#5d8969; background:#e8f1e5; }
+.energy-week-day small { color:#96a298; font-size:8px; }
+.energy-history-section > .well-card { max-width:100%; }
+.energy-history-section .well-timeline { max-width:760px; }
+@media (max-width:760px) {
+  .sleep-data-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .sleep-data-grid .well-data-cell:last-child { grid-column:1 / -1; }
+  .sleep-trend-chart { height:150px; gap:5px; }
+  .sleep-trend-value { font-size:7px; }
+  .sleep-trend-track { width:min(25px,78%); }
+  .energy-week { gap:4px; }
+  .energy-week-day > span { width:26px; height:26px; }
+}
 @keyframes well-stage-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
 @keyframes well-ruler-in { from { transform:scaleX(0); } to { transform:scaleX(1); } }
 @keyframes well-enter { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }

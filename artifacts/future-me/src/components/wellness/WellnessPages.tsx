@@ -10,7 +10,7 @@ import type { FeelingWellnessData, Profile, WellnessEntry, WellnessEntryInput } 
 import { useWellness } from './use-wellness';
 import {
   calculateCalorieTarget, calculateStepGoal, dailySeries, entryForDay,
-  futureMeProjection, localDay, stepProgress,
+  energyAction, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress,
 } from '@/lib/wellness-metrics';
 import './wellness.css';
 
@@ -115,7 +115,7 @@ function WellBody({ pageId, profile, wellness }: { pageId: WellnessPageId; profi
     case 'dashboard': content = <DashboardPage profile={profile} {...wellness} />; break;
     case 'future-me': content = <FuturePage {...wellness} />; break;
     case 'experiments': content = <ExperimentsPage {...wellness} />; break;
-    case 'sleep': content = <SleepPage {...wellness} />; break;
+    case 'sleep': content = <SleepPage profile={profile} {...wellness} />; break;
     case 'five-minute': content = <FiveMinutePage {...wellness} />; break;
     case 'feelings': content = <FeelingsPage {...wellness} />; break;
     case 'periods': content = <PeriodsPage {...wellness} />; break;
@@ -280,13 +280,13 @@ function FuturePage({ entries }: ReturnType<typeof useWellness>) {
   const nextAction = projection.steps.loggedDays === 0 ? 'Add a steps total on a day you want to remember.' :
     projection.sleep.loggedDays === 0 ? 'A sleep note would add another useful part of your own picture.' :
     !experimentEntries.length ? 'If you have an active experiment, add one check-in to record what you notice.' :
-    projection.energy.loggedDays === 0 ? 'If useful, add one brief energy note on a day you want to remember.' :
+    projection.energy.completedActionDays === 0 ? 'If useful, complete one small action that fits your energy today.' :
     'Keep logging whichever daily detail feels useful to you.';
   const strongestPatterns = [
     { label: 'step totals', days: projection.steps.loggedDays },
     { label: 'calorie totals', days: projection.calories.loggedDays },
     { label: 'sleep notes', days: projection.sleep.loggedDays },
-    { label: 'energy notes', days: projection.energy.loggedDays },
+    { label: 'completed energy actions', days: projection.energy.completedActionDays },
     { label: 'feeling notes', days: projection.feelings.loggedDays },
     { label: 'experiment check-ins', days: experimentDays },
   ].filter((pattern) => pattern.days > 0)
@@ -336,7 +336,7 @@ function FuturePage({ entries }: ReturnType<typeof useWellness>) {
             <div className="well-metric-box"><span>Mean steps per logged day</span><strong>{projection.steps.average === null ? '—' : projection.steps.average.toLocaleString()}</strong><small>{projection.steps.loggedDays} step {projection.steps.loggedDays === 1 ? 'day' : 'days'}</small></div>
             <div className="well-metric-box"><span>Calorie logging</span><strong>{projection.calories.loggedDays} of {days} days</strong><small>Only saved daily totals count</small></div>
             <div className="well-metric-box"><span>Sleep notes</span><strong>{averageSleepLabel}</strong><small>{projection.sleep.loggedDays} logged nights</small></div>
-            <div className="well-metric-box"><span>Energy notes</span><strong>{projection.energy.average === null ? '—' : `${projection.energy.average}%`}</strong><small>{projection.energy.loggedDays} entries</small></div>
+            <div className="well-metric-box"><span>Completed energy actions</span><strong>{projection.energy.completedActions}</strong><small>{projection.energy.completedActionDays} logged days</small></div>
             <div className="well-metric-box"><span>Experiment check-ins</span><strong>{projection.experiments.checkins ? `${projection.experiments.completed} / ${projection.experiments.checkins} tried` : '—'}</strong><small>{projection.experiments.averageRating === null ? 'No rating recorded' : `Mean rating ${projection.experiments.averageRating} / 5`}</small></div>
             <div className="well-metric-box"><span>Feelings and periods</span><strong>{projection.feelings.loggedDays} · {periods.length}</strong><small>feeling days · period notes</small></div>
           </div>
@@ -472,84 +472,148 @@ function InsightsPage({ entries }: ReturnType<typeof useWellness>) {
   </>;
 }
 
-function SleepPage({ entries, save, isSaving }: ReturnType<typeof useWellness>) {
+function SleepPage({ profile, entries, save, isSaving }: ReturnType<typeof useWellness> & { profile: Profile }) {
   const [bedtime, setBedtime] = useState('22:30');
   const [wakeTime, setWakeTime] = useState('06:30');
+  const [duration, setDuration] = useState('480');
   const [quality, setQuality] = useState(3);
   const [nap, setNap] = useState('0');
   const [referenceHours, setReferenceHours] = useState(() => {
     if (typeof window === 'undefined') return 8;
-    const stored = Number(window.localStorage.getItem('future-me-sleep-reference-hours'));
+    let stored = NaN;
+    try {
+      stored = Number(window.localStorage.getItem(`future-me-sleep-reference-hours:${profile.id}`));
+    } catch {
+      stored = NaN;
+    }
     return Number.isFinite(stored) && stored >= 4 && stored <= 12 ? stored : 8;
   });
   const recent = sortNewest(withinDays(entries.filter((entry) => entry.kind === 'sleep'), 14));
   const targetMinutes = referenceHours * 60;
-  const sleepData = recent.map((entry) => readData<SleepData>(entry)).filter((item): item is SleepData => !!item);
-  const averageMinutes = sleepData.length ? Math.round(sleepData.reduce((sum, item) => sum + item.durationMinutes, 0) / sleepData.length) : null;
-  const bedtimeTimes = sleepData.map((item) => timeToMinutes(item.bedtime));
-  const bedtimeSpan = bedtimeTimes.length >= 2 ? Math.max(...bedtimeTimes) - Math.min(...bedtimeTimes) : null;
-  const consistency = bedtimeSpan === null ? null : Math.min(bedtimeSpan, 1440 - bedtimeSpan);
+  const summary = sleepSummary(entries, 7, todayISO(), targetMinutes);
+  const averageMinutes = summary.averageMinutes;
+  const formatDuration = (minutes: number) => `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+  const updateDurationFromTimes = (nextBedtime: string, nextWakeTime: string) => {
+    const minutes = (timeToMinutes(nextWakeTime) - timeToMinutes(nextBedtime) + 1440) % 1440;
+    setDuration(String(minutes));
+  };
   const logSleep = (event: FormEvent) => {
     event.preventDefault();
-    const start = timeToMinutes(bedtime);
-    const end = timeToMinutes(wakeTime);
-    const durationMinutes = (end - start + 1440) % 1440;
-    if (durationMinutes < 1) return;
+    const durationMinutes = Number(duration);
+    const napMinutes = nap === '' ? undefined : Number(nap);
+    if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) return;
+    if (napMinutes !== undefined && (!Number.isInteger(napMinutes) || napMinutes < 0 || napMinutes > 600)) return;
     save(makeInput(dateKey('sleep'), 'sleep', todayISO(), {
-      bedtime, wakeTime, durationMinutes, quality, napMinutes: Math.max(0, Math.min(600, Number(nap) || 0)),
+      bedtime, wakeTime, durationMinutes, quality, napMinutes, referenceTargetMinutes: targetMinutes,
     }), 'Sleep note saved. Your rest belongs to your own record.');
   };
   const updateTarget = (value: number) => {
     setReferenceHours(value);
-    window.localStorage.setItem('future-me-sleep-reference-hours', String(value));
+    try {
+      window.localStorage.setItem(`future-me-sleep-reference-hours:${profile.id}`, String(value));
+    } catch {
+      // The selected reference still applies for this session when storage is unavailable.
+    }
   };
+  const trendMaximum = Math.max(1, targetMinutes, ...summary.trend.map((point) => point.value ?? 0));
+  const shortfallCopy = summary.loggedNights
+    ? summary.estimatedDebtMinutes > 0
+      ? `${formatDuration(summary.estimatedDebtMinutes)} estimated shortfall across ${summary.loggedNights} logged ${summary.loggedNights === 1 ? 'night' : 'nights'}.`
+      : `No estimated shortfall against your reference across ${summary.loggedNights} logged ${summary.loggedNights === 1 ? 'night' : 'nights'}.`
+    : 'A shortfall estimate will appear after you save a sleep note.';
   return <>
-    <PageHeading eyebrow="REST & RHYTHM" title={<>Sleep,<br /><em>in your own words.</em></>} copy="Record the shape of your rest and notice your rhythms. Estimates are based only on the details you choose to log." />
-    <div className="well-grid two">
+    <PageHeading eyebrow="REST & RHYTHM" title={<>Sleep,<br /><em>in your own words.</em></>} copy="Record the shape of your rest and notice your rhythms. Any estimate is based only on details you choose to save." />
+    <div className="well-grid two sleep-top-grid">
       <Card>
         <CardHeading label="A sleep note for last night" icon={<Moon size={17} />} />
         <form className="well-form" onSubmit={logSleep}>
           <div className="well-form-row">
-            <Field label="Bedtime"><input type="time" value={bedtime} onChange={(event) => setBedtime(event.target.value)} required data-testid="input-sleep-bedtime" /></Field>
-            <Field label="Wake time"><input type="time" value={wakeTime} onChange={(event) => setWakeTime(event.target.value)} required data-testid="input-sleep-wake" /></Field>
+            <Field label="Bedtime"><input type="time" value={bedtime} onChange={(event) => { setBedtime(event.target.value); updateDurationFromTimes(event.target.value, wakeTime); }} required data-testid="input-sleep-bedtime" /></Field>
+            <Field label="Wake time"><input type="time" value={wakeTime} onChange={(event) => { setWakeTime(event.target.value); updateDurationFromTimes(bedtime, event.target.value); }} required data-testid="input-sleep-wake" /></Field>
           </div>
           <div className="well-form-row">
+            <Field label="Total sleep duration (minutes)"><input type="number" min="1" max="1440" step="1" inputMode="numeric" value={duration} onChange={(event) => setDuration(event.target.value)} required data-testid="input-sleep-duration" /></Field>
             <Field label="How rested did it feel?">
               <select value={quality} onChange={(event) => setQuality(Number(event.target.value))} data-testid="select-sleep-quality">
                 {[1, 2, 3, 4, 5].map((number) => <option key={number} value={number}>{number} — {['Not rested', 'A little rested', 'Somewhat rested', 'Rested', 'Very rested'][number - 1]}</option>)}
               </select>
             </Field>
+          </div>
+          <div className="well-form-row">
             <Field label="Nap, if any (minutes)"><input type="number" min="0" max="600" value={nap} onChange={(event) => setNap(event.target.value)} data-testid="input-sleep-nap" /></Field>
           </div>
-          <p className="well-inline-note">A sleep span crossing midnight is calculated automatically. Nap minutes are kept separately.</p>
+          <p className="well-inline-note">Duration starts from your bedtime and wake time, and you can adjust it to match your own estimate. Nap minutes stay separate.</p>
           <div className="well-actions"><button className="well-btn" type="submit" disabled={isSaving} data-testid="button-save-sleep"><Check size={14} /> Save sleep note</button></div>
         </form>
       </Card>
       <Card>
-        <CardHeading label="Your recent rest" icon={<BedDouble size={17} />} />
+        <CardHeading label="Your recent sleep" icon={<BedDouble size={17} />} />
         {averageMinutes === null ? <Empty title="No sleep notes yet" copy="A few nights of your own notes will make these summaries useful." icon={<Moon size={18} />} /> : <>
-          <div className="well-data-grid">
-            <div className="well-data-cell"><span>Recent average</span><strong>{Math.floor(averageMinutes / 60)}h {averageMinutes % 60}m</strong></div>
-            <div className="well-data-cell"><span>Personal reference</span><strong>{referenceHours}h</strong></div>
-            <div className="well-data-cell"><span>Difference from reference</span><strong>{averageMinutes < targetMinutes ? `−${Math.floor((targetMinutes - averageMinutes) / 60)}h ${(targetMinutes - averageMinutes) % 60}m` : 'At or above'}</strong></div>
+          <div className="sleep-summary-lead" data-testid="text-sleep-shortfall"><span>Estimated sleep shortfall</span><strong>{shortfallCopy}</strong></div>
+          <div className="well-data-grid sleep-data-grid">
+            <div className="well-data-cell"><span>Average across logged nights</span><strong data-testid="text-sleep-average">{formatDuration(averageMinutes)}</strong></div>
+            <div className="well-data-cell"><span>Your reference</span><strong>{formatDuration(summary.referenceTargetMinutes)}</strong></div>
+            <div className="well-data-cell"><span>Logged nights</span><strong>{summary.loggedNights} of 7</strong></div>
           </div>
-          <p className="well-note">{consistency === null ? 'Log at least two nights to compare your bedtime range.' : `Your logged bedtimes span about ${Math.floor(consistency / 60)}h ${consistency % 60}m in this recent sample.`}</p>
+          <p className="well-note">{summary.bedtimeVariationMinutes === null
+            ? 'Bedtime consistency needs at least two logged nights.'
+            : `Bedtimes varied by about ${formatDuration(summary.bedtimeVariationMinutes)} across your logged nights in this seven-day sample.`}</p>
         </>}
         <div style={{ marginTop: 15 }}>
-          <Field label="Your own reference target (hours)">
+          <Field label="Your own reference (hours)">
             <select value={referenceHours} onChange={(event) => updateTarget(Number(event.target.value))} data-testid="select-sleep-reference">
-              {[6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10].map((hour) => <option key={hour} value={hour}>{hour} hours</option>)}
+              {Array.from({ length: 17 }, (_, index) => 4 + index * .5).map((hour) => <option key={hour} value={hour}>{hour} hours</option>)}
             </select>
           </Field>
         </div>
-        {averageMinutes !== null && averageMinutes < targetMinutes && <div className="well-callout" style={{ marginTop: 14 }}><strong>A gentle option: </strong>if it suits your day, you could make a little more room for rest tonight. This is a comparison with your chosen reference, not a health assessment.</div>}
+        <p className="well-note">This is an estimate from your saved sleep duration, optional nap, and chosen reference. It is not a medical measurement.</p>
       </Card>
     </div>
-    <section className="well-section"><div className="well-section-head"><div><span className="well-eyebrow">RECENT NIGHTS</span><h2>What you’ve noted</h2></div></div>
-      {recent.length ? <div className="well-record-list">{recent.slice(0, 7).map((entry) => {
-        const sleep = readData<SleepData>(entry)!;
-        return <div className="well-record" key={entry.key}><div className="well-record-main"><span className="well-record-icon"><Moon size={15} /></span><div><div className="well-record-title">{fmtDate(entry.date)}</div><div className="well-record-meta">{sleep.bedtime} to {sleep.wakeTime} · quality {sleep.quality}/5{sleep.napMinutes ? ` · ${sleep.napMinutes}m nap` : ''}</div></div></div><strong className="well-record-value">{Math.floor(sleep.durationMinutes / 60)}h {sleep.durationMinutes % 60}m</strong></div>;
-      })}</div> : <Empty title="Your first sleep note will live here" copy="Nothing is prefilled. Start with last night whenever you are ready." icon={<Moon size={18} />} />}
+    <section className="well-section sleep-trend-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">SEVEN-DAY VIEW</span><h2>Your recovery trend</h2></div></div>
+      <Card className="sleep-trend-card">
+        <div className="sleep-trend-chart" role="img" aria-label="Seven-day sleep duration trend. Blank columns are nights without a saved sleep note." data-testid="chart-sleep-trend">
+          {summary.trend.map((point) => {
+            const height = point.value === null ? 0 : Math.max(7, Math.round((point.value / trendMaximum) * 100));
+            return <div className={`sleep-trend-day ${point.value === null ? 'is-blank' : ''}`} key={point.date} data-testid={`sleep-trend-day-${point.date}`} title={`${fmtDate(point.date)}: ${point.value === null ? 'not logged' : formatDuration(point.value)}`}>
+              <span className="sleep-trend-value">{point.value === null ? '' : formatDuration(point.value)}</span>
+              <span className="sleep-trend-track"><i style={{ height: `${height}%` }} /></span>
+              <small>{new Intl.DateTimeFormat('en', { weekday: 'narrow' }).format(new Date(`${point.date}T12:00:00`))}</small>
+            </div>;
+          })}
+        </div>
+        <p className="well-note">Each mark is a saved duration. Missing nights stay blank, not zero.</p>
+      </Card>
+    </section>
+    <section className="well-section sleep-goal-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">A GENTLE POSSIBILITY</span><h2>Tonight&apos;s small goal</h2></div></div>
+      <div className="well-grid two">
+        <Card className="sleep-goal-card">
+          <CardHeading label="Choose what feels kind" icon={<Moon size={17} />} />
+          <p className="sleep-goal-intro" data-testid="text-sleep-goal">{summary.estimatedDebtMinutes > 0
+            ? 'If it suits your evening, try making room for rest a little earlier — even 10 minutes is a small start.'
+            : 'A calm wind-down or a wake time that feels familiar may be enough for tonight.'}</p>
+          <ul className="sleep-suggestion-list">
+            <li>Move bedtime earlier by 10–15 minutes, only if it feels workable.</li>
+            <li>Keep a wake time that feels steady for your life.</li>
+            <li>A short daytime rest can be an option when you need one.</li>
+            <li>If late caffeine seems relevant to you, consider having it a little earlier.</li>
+            <li>Try a brief wind-down that helps you shift out of the day.</li>
+          </ul>
+          <p className="well-note">No perfect schedule is expected. These are small options, not instructions.</p>
+        </Card>
+        <Card>
+          <CardHeading label="Recent nights" icon={<History size={17} />} />
+          {recent.length ? <div className="well-record-list">{recent.slice(0, 7).map((entry) => {
+            const sleep = readData<SleepData>(entry)!;
+            return <div className="well-record" key={entry.key} data-testid={`sleep-record-${entry.date}`}>
+              <div className="well-record-main"><span className="well-record-icon"><Moon size={15} /></span><div><div className="well-record-title">{fmtDate(entry.date)}</div><div className="well-record-meta">{sleep.bedtime} to {sleep.wakeTime} · quality {sleep.quality}/5{sleep.napMinutes ? ` · ${sleep.napMinutes}m nap` : ''}</div></div></div>
+              <strong className="well-record-value">{formatDuration(sleep.durationMinutes)}</strong>
+            </div>;
+          })}</div> : <Empty title="Your first sleep note will live here" copy="Nothing is prefilled. Start with last night whenever you are ready." icon={<Moon size={18} />} />}
+        </Card>
+      </div>
+      <p className="sleep-disclaimer" data-testid="text-sleep-estimate-disclaimer">Sleep shortfall and bedtime patterns are personal estimates from saved entries, not medical measurements or advice.</p>
     </section>
   </>;
 }
@@ -559,40 +623,52 @@ function timeToMinutes(time: string) {
   return (hour || 0) * 60 + (minute || 0);
 }
 
-const energyActions: Record<EnergyData['level'], string> = {
-  10: 'Take a slow breath, then let one thing wait.',
-  30: 'Step away from your screen for a quiet moment.',
-  50: 'Stretch your shoulders and take a short walk.',
-  70: 'Choose one small task and give it five focused minutes.',
-  90: 'Use a little of this energy on something you enjoy.',
-};
 function FiveMinutePage({ entries, save, isSaving }: ReturnType<typeof useWellness>) {
   const [level, setLevel] = useState<EnergyData['level'] | null>(null);
-  const action = level === null ? '' : energyActions[level];
-  const history = sortNewest(entries.filter((entry) => entry.kind === 'energy')).slice(0, 8);
+  const action = level === null ? '' : energyAction(level);
+  const energyEntries = sortNewest(entries.filter((entry) => entry.kind === 'energy'));
+  const history = energyEntries.slice(0, 10);
+  const consistency = loggingConsistency(entries, 7, todayISO());
   const completeAction = () => {
     if (level === null) return;
-    save(makeInput(`energy-${todayISO()}-${Date.now()}`, 'energy', todayISO(), { level, action, completed: true }), 'Your five-minute moment is saved. Well done for choosing it.');
+    save(makeInput(`energy-${todayISO()}-${Date.now()}`, 'energy', todayISO(), { level, action, completed: true }), 'Your action is saved in your personal record.');
   };
   return <>
-    <PageHeading eyebrow="A MOMENT THAT FITS" title={<>Five minutes,<br /><em>at your pace.</em></>} copy="Choose how much energy you have right now. We’ll offer one small option to match; you can change your mind at any time." />
+    <PageHeading eyebrow="A MOMENT THAT FITS" title={<>Five minutes,<br /><em>at your pace.</em></>} copy="Do what matches your energy today. Choose one small option, adapt it, or leave it for later." />
     <div className="well-grid two">
       <Card>
-        <CardHeading label="How much energy is here?" icon={<Sun size={17} />} />
+        <CardHeading label="How much energy do you have today?" icon={<Sun size={17} />} />
+        <h2 className="energy-question">How much energy do you have today?</h2>
         <div className="well-energy-actions" role="group" aria-label="Choose current energy level">
           {([10, 30, 50, 70, 90] as const).map((value) => <button type="button" key={value} aria-pressed={level === value} onClick={() => setLevel(value)} data-testid={`button-energy-${value}`}><span>{value}%</span><small>{value < 30 ? 'Very low' : value < 50 ? 'Low' : value < 70 ? 'Steady' : value < 90 ? 'Good' : 'Plenty'}</small></button>)}
         </div>
-        {level !== null ? <div className="well-action-panel" style={{ marginTop: 17 }} aria-live="polite"><span className="well-overline">A MATCHED FIVE-MINUTE OPTION</span><strong style={{ marginTop: 7 }}>{action}</strong><p>Only a suggestion. Keep it, adapt it, or leave it for later.</p></div> : <div className="well-callout" style={{ marginTop: 17 }}>There is no ideal answer. Choose the number that feels closest in this moment.</div>}
-        <div className="well-actions" style={{ marginTop: 16 }}><button type="button" className="well-btn" onClick={completeAction} disabled={level === null || isSaving} data-testid="button-complete-five-minute"><Check size={14} /> I did this</button><button type="button" className="well-btn ghost" onClick={() => setLevel(null)} disabled={level === null} data-testid="button-reset-energy">Start over</button></div>
+        {level !== null ? <div className="well-action-panel" style={{ marginTop: 17 }} aria-live="polite" data-testid="text-energy-matched-action"><span className="well-overline">ONE PRACTICAL OPTION · {level}%</span><strong style={{ marginTop: 7 }}>{action}</strong><p>Only a suggestion. Keep it, adapt it, or leave it for later.</p></div> : <div className="well-callout" style={{ marginTop: 17 }}>There is no ideal answer. Choose the number that feels closest today.</div>}
+        <p className="energy-philosophy">Do what matches your energy today.</p>
+        <div className="well-actions" style={{ marginTop: 16 }}><button type="button" className="well-btn" onClick={completeAction} disabled={level === null || isSaving} data-testid="button-complete-five-minute"><Check size={14} /> {isSaving ? 'Saving…' : 'Mark this complete'}</button><button type="button" className="well-btn ghost" onClick={() => setLevel(null)} disabled={level === null || isSaving} data-testid="button-reset-energy">Choose again</button></div>
       </Card>
       <Card>
-        <CardHeading label="Your recent moments" icon={<Clock3 size={17} />} />
-        {history.length ? <div className="well-timeline">{history.map((entry) => {
-          const data = readData<EnergyData>(entry)!;
-          return <div className="well-timeline-item" key={entry.key}><time>{fmtDate(entry.date, { month: 'short', day: 'numeric' })} · {data.level}% energy</time><strong>{data.action}</strong><p>{data.completed ? 'Marked as completed' : 'Saved as an option'}</p></div>;
-        })}</div> : <Empty title="No moments to look back on" copy="Completed actions you choose to save will appear here." icon={<Clock3 size={18} />} />}
+        <CardHeading label="Seven-day consistency" icon={<CalendarDays size={17} />} />
+        <div className="energy-consistency" data-testid="text-energy-consistency"><strong>{consistency.loggedDays} of 7</strong><span>days with a saved wellness note or completed action</span></div>
+        <div className="energy-week" role="img" aria-label={`${consistency.loggedDays} of 7 days with a saved note or completed energy action`}>
+          {Array.from({ length: 7 }, (_, index) => {
+            const date = dateOffset(todayISO(), index - 6);
+            const hasRecord = entries.some((entry) => entry.date === date && (entry.kind !== 'energy' || readData<EnergyData>(entry)?.completed === true));
+            return <div className={`energy-week-day ${hasRecord ? 'is-logged' : ''}`} key={date} data-testid={`energy-consistency-day-${date}`}><span>{hasRecord ? <Check size={12} /> : null}</span><small>{new Intl.DateTimeFormat('en', { weekday: 'narrow' }).format(new Date(`${date}T12:00:00`))}</small></div>;
+          })}
+        </div>
+        <p className="well-note">A day counts when you saved a wellness note or marked an energy action complete. Quiet days are not a problem.</p>
       </Card>
     </div>
+    <section className="well-section energy-history-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">YOUR SAVED RECORD</span><h2>Daily history</h2></div></div>
+      <Card>
+        <CardHeading label="Recent moments" icon={<Clock3 size={17} />} />
+        {history.length ? <div className="well-timeline">{history.map((entry) => {
+          const data = readData<EnergyData>(entry)!;
+          return <div className="well-timeline-item" key={entry.key} data-testid={`energy-history-${entry.key}`}><time>{fmtDate(entry.date, { month: 'short', day: 'numeric' })} · {data.level}% energy</time><strong>{data.action}</strong><p>{data.completed ? 'Completed and saved' : 'Saved as an option, not counted as a logged day'}</p></div>;
+        })}</div> : <Empty title="No moments to look back on" copy="Completed actions you choose to save will appear here." icon={<Clock3 size={18} />} />}
+      </Card>
+    </section>
   </>;
 }
 

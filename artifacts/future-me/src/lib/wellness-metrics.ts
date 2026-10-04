@@ -194,7 +194,10 @@ export type FutureMeProjection = {
   };
   calories: NumericSummary;
   sleep: NumericSummary;
-  energy: NumericSummary;
+  energy: NumericSummary & {
+    completedActions: number;
+    completedActionDays: number;
+  };
   feelings: { loggedDays: number; mostLogged: string | null };
   experiments: {
     checkins: number;
@@ -214,7 +217,12 @@ export function futureMeProjection(
   const windowEntries = entries.filter(
     (entry) => entry.date >= first && entry.date <= through,
   );
-  const observedDays = new Set(windowEntries.map((entry) => entry.date)).size;
+  const completedEnergyEntries = entriesOfKind(windowEntries, "energy")
+    .filter(isCompletedEnergyAction);
+  const recordEntries = windowEntries.filter(
+    (entry) => entry.kind !== "energy" || isCompletedEnergyAction(entry),
+  );
+  const observedDays = new Set(recordEntries.map((entry) => entry.date)).size;
   const steps = measurementSummary(
     windowEntries,
     "steps",
@@ -293,7 +301,13 @@ export function futureMeProjection(
     },
     calories,
     sleep,
-    energy,
+    energy: {
+      ...energy,
+      completedActions: completedEnergyEntries.length,
+      completedActionDays: new Set(
+        completedEnergyEntries.map((entry) => entry.date),
+      ).size,
+    },
     feelings: { loggedDays: new Set(
       entriesOfKind(windowEntries, "feeling").map((entry) => entry.date),
     ).size, mostLogged },
@@ -316,7 +330,11 @@ export function loggingConsistency(
   const first = addCalendarDays(through, -(days - 1));
   const loggedDates = new Set(
     entries
-      .filter((entry) => entry.date >= first && entry.date <= through)
+      .filter((entry) =>
+        entry.date >= first &&
+        entry.date <= through &&
+        (entry.kind !== "energy" || isCompletedEnergyAction(entry)),
+      )
       .map((entry) => entry.date),
   );
   return {
@@ -330,44 +348,89 @@ export function sleepSummary(
   entries: WellnessEntry[],
   days = 7,
   through = localDay(),
+  selectedReferenceTargetMinutes?: number,
 ) {
-  const first = addCalendarDays(through, -(days - 1));
+  const safeDays = Number.isInteger(days) && days > 0 ? days : 7;
+  const first = addCalendarDays(through, -(safeDays - 1));
   const sleepEntries = entriesOfKind(entries, "sleep").filter(
     (entry) => entry.date >= first && entry.date <= through,
   );
-  const durations = sleepEntries
-    .map((entry) => objectData(entry).durationMinutes)
-    .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+  const mostRecentEntryByDate = new Map<string, WellnessEntry>();
+  for (const entry of sleepEntries) {
+    const previous = mostRecentEntryByDate.get(entry.date);
+    if (!previous || entry.updatedAt >= previous.updatedAt) {
+      mostRecentEntryByDate.set(entry.date, entry);
+    }
+  }
+  const validSleepEntries = [...mostRecentEntryByDate.values()].filter((entry) => {
+    const duration = objectData(entry).durationMinutes;
+    return typeof duration === "number" &&
+      Number.isInteger(duration) &&
+      duration >= 1 &&
+      duration <= 1_440;
+  });
+  const durations = validSleepEntries.map(
+    (entry) => objectData(entry).durationMinutes as number,
+  );
   const targetEntry = [...sleepEntries].reverse().find((entry) => {
     const target = objectData(entry).referenceTargetMinutes;
-    return typeof target === "number" && target >= 180 && target <= 720;
+    return typeof target === "number" &&
+      Number.isInteger(target) &&
+      target >= 180 &&
+      target <= 720;
   });
-  const target = targetEntry
-    ? Number(objectData(targetEntry).referenceTargetMinutes)
-    : 480;
-  const totalShortfall = durations.reduce(
-    (sum, duration) => sum + Math.max(0, target - duration),
-    0,
-  );
-  const bedtimeMinutes = sleepEntries
+  const savedTarget = targetEntry
+    ? objectData(targetEntry).referenceTargetMinutes
+    : undefined;
+  const target = typeof selectedReferenceTargetMinutes === "number" &&
+      Number.isInteger(selectedReferenceTargetMinutes) &&
+      selectedReferenceTargetMinutes >= 180 &&
+      selectedReferenceTargetMinutes <= 720
+    ? selectedReferenceTargetMinutes
+    : typeof savedTarget === "number"
+      ? savedTarget
+      : 480;
+  const totalShortfall = validSleepEntries.reduce((sum, entry) => {
+    const data = objectData(entry);
+    const nap = data.napMinutes;
+    const napMinutes = typeof nap === "number" &&
+        Number.isInteger(nap) &&
+        nap >= 0 &&
+        nap <= 600
+      ? nap
+      : 0;
+    return sum + Math.max(
+      0,
+      target - Math.min(1_440, Number(data.durationMinutes) + napMinutes),
+    );
+  }, 0);
+  const bedtimeMinutes = validSleepEntries
     .map((entry) => objectData(entry).bedtime)
-    .filter((value): value is string => typeof value === "string" && /^\d{2}:\d{2}$/.test(value))
+    .filter((value): value is string =>
+      typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value),
+    )
     .map((value) => {
       const [hours, minutes] = value.split(":").map(Number);
-      return (hours * 60 + minutes + 720) % 1_440;
-    });
-  const bedtimeVariation = bedtimeMinutes.length > 1
-    ? Math.round(
-        bedtimeMinutes.slice(1).reduce(
-          (sum, value, index) =>
-            sum + Math.min(
-              Math.abs(value - bedtimeMinutes[index]),
-              1_440 - Math.abs(value - bedtimeMinutes[index]),
-            ),
-          0,
-        ) / (bedtimeMinutes.length - 1),
-      )
-    : null;
+      return hours * 60 + minutes;
+    })
+    .sort((left, right) => left - right);
+  let bedtimeVariation: number | null = null;
+  if (bedtimeMinutes.length > 1) {
+    let largestGap = 0;
+    for (let index = 0; index < bedtimeMinutes.length; index += 1) {
+      const current = bedtimeMinutes[index];
+      const next = bedtimeMinutes[(index + 1) % bedtimeMinutes.length] +
+        (index === bedtimeMinutes.length - 1 ? 1_440 : 0);
+      largestGap = Math.max(largestGap, next - current);
+    }
+    bedtimeVariation = 1_440 - largestGap;
+  }
+  const durationByDate = new Map(
+    validSleepEntries.map((entry) => [
+      entry.date,
+      objectData(entry).durationMinutes as number,
+    ]),
+  );
   return {
     loggedNights: durations.length,
     averageMinutes: durations.length
@@ -376,7 +439,21 @@ export function sleepSummary(
     referenceTargetMinutes: target,
     estimatedDebtMinutes: totalShortfall,
     bedtimeVariationMinutes: bedtimeVariation,
+    trend: Array.from({ length: safeDays }, (_, index) => {
+      const date = addCalendarDays(first, index);
+      return { date, value: durationByDate.get(date) ?? null };
+    }),
   };
+}
+
+function isCompletedEnergyAction(entry: WellnessEntry): boolean {
+  const data = objectData(entry);
+  return entry.kind === "energy" &&
+    data.completed === true &&
+    [10, 30, 50, 70, 90].includes(Number(data.level)) &&
+    typeof data.action === "string" &&
+    data.action.trim().length > 0 &&
+    data.action.length <= 160;
 }
 
 export function feelingSleepPattern(
@@ -441,9 +518,9 @@ export function cycleSummary(entries: WellnessEntry[], today = localDay()) {
 }
 
 export function energyAction(level: 10 | 30 | 50 | 70 | 90): string {
-  if (level <= 10) return "Drink some water and take two gentle minutes to stretch.";
-  if (level <= 30) return "Take a five-minute walk or try a short stretch.";
-  if (level <= 50) return "Try a 10-minute walk outside at a comfortable pace.";
-  if (level <= 70) return "Choose 15 minutes of movement that feels good today.";
-  return "Take a longer walk, prepare a simple meal, or check in on an experiment.";
+  if (level === 10) return "Drink some water and take two gentle minutes to stretch.";
+  if (level === 30) return "Take a five-minute walk at a comfortable pace, or stretch indoors.";
+  if (level === 50) return "Try 10 minutes of movement or a short walk outside.";
+  if (level === 70) return "Choose 15 minutes of movement that feels right for you.";
+  return "If you want, take a longer walk, prepare part of a meal, or check in on an experiment.";
 }
