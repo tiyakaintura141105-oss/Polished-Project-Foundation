@@ -108,6 +108,13 @@ function dataMatchesKind(kind: EntryKind, value: unknown): value is Record<strin
         boundedInteger(value.durationDays, 1, 90) &&
         Array.isArray(value.metrics) && value.metrics.length >= 1 && value.metrics.length <= 8 &&
         value.metrics.every((metric) => boundedString(metric, 1, 80)) &&
+        (value.checkinMetric === undefined ||
+          (boundedString(value.checkinMetric, 1, 80) &&
+            value.metrics.includes(value.checkinMetric))) &&
+        (value.baselineRating === undefined ||
+          boundedInteger(value.baselineRating, 1, 5)) &&
+        (value.pausedAt === undefined || validCalendarDate(value.pausedAt)) &&
+        (value.pausedDays === undefined || boundedInteger(value.pausedDays, 0, 36_500)) &&
         ["active", "paused", "completed", "cancelled"].includes(String(value.status)) &&
         validCalendarDate(value.startedAt) &&
         (value.endedAt === undefined || validCalendarDate(value.endedAt));
@@ -115,6 +122,10 @@ function dataMatchesKind(kind: EntryKind, value: unknown): value is Record<strin
       return boundedString(value.experimentKey, 1, 120) &&
         typeof value.completed === "boolean" &&
         boundedInteger(value.rating, 1, 5) &&
+        (value.phase === undefined ||
+          value.phase === "before" ||
+          value.phase === "during") &&
+        (value.metric === undefined || boundedString(value.metric, 1, 80)) &&
         (value.note === undefined || boundedString(value.note, 0, 1_000));
     case "period":
       return validCalendarDate(value.startDate) &&
@@ -247,7 +258,10 @@ router.put("/wellness/entries", requireAuth, async (req, res): Promise<void> => 
   if (parsed.data.kind === "experiment-checkin") {
     const experimentKey = String(entryData.experimentKey);
     const [experiment] = await db
-      .select({ entryKey: wellnessEntriesTable.entryKey })
+      .select({
+        entryKey: wellnessEntriesTable.entryKey,
+        data: wellnessEntriesTable.data,
+      })
       .from(wellnessEntriesTable)
       .where(and(
         eq(wellnessEntriesTable.clerkUserId, userId),
@@ -258,6 +272,27 @@ router.put("/wellness/entries", requireAuth, async (req, res): Promise<void> => 
     if (!experiment) {
       res.status(404).json({ error: "That experiment could not be found." });
       return;
+    }
+    const experimentData = experiment.data;
+    if (experimentData.status !== "active") {
+      res.status(409).json({ error: "Only active experiments can receive a daily check-in." });
+      return;
+    }
+    if (typeof entryData.metric === "string") {
+      const metrics = Array.isArray(experimentData.metrics)
+        ? experimentData.metrics
+        : [];
+      if (!metrics.includes(entryData.metric)) {
+        res.status(400).json({ error: "Choose a metric from this experiment." });
+        return;
+      }
+      if (
+        typeof experimentData.checkinMetric === "string" &&
+        entryData.metric !== experimentData.checkinMetric
+      ) {
+        res.status(400).json({ error: "Choose this experiment’s daily check-in metric." });
+        return;
+      }
     }
   }
 

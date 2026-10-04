@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { ExperimentCheckinWellnessDataPhase } from './experimentCheckinWellnessDataPhase';
 
 export interface ExperimentCheckinWellnessData {
   /**
@@ -18,6 +19,12 @@ export interface ExperimentCheckinWellnessData {
      * @maximum 5
      */
   rating: number;
+  phase?: ExperimentCheckinWellnessDataPhase;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  metric?: string;
   /** @maxLength 1000 */
   note?: string;
 }

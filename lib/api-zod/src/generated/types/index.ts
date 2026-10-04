@@ -10,6 +10,7 @@ export * from './caloriesWellnessData';
 export * from './energyWellnessData';
 export * from './energyWellnessDataLevel';
 export * from './experimentCheckinWellnessData';
+export * from './experimentCheckinWellnessDataPhase';
 export * from './experimentWellnessData';
 export * from './experimentWellnessDataStatus';
 export * from './feelingWellnessData';

@@ -158,6 +158,85 @@
 .well-table th { padding:9px 8px; color:#98a59a; text-align:left; font-weight:600; font-size:8px; letter-spacing:.1em; text-transform:uppercase; }
 .well-table td { padding:11px 8px; border-top:1px solid #e4ebe2; color:#718378; vertical-align:top; }
 .well-table td strong { color:#4e6b57; font-weight:650; }
+.well-progress span { transition:width .48s cubic-bezier(.2,.7,.25,1); }
+.movement-card { background:linear-gradient(145deg,#fff 0%,#f8fbf5 100%); border-color:#d9e7d9; }
+.movement-card .well-icon { color:#527d67; background:#e6f0e5; }
+.steps-stage { display:inline-flex; align-items:center; margin-top:10px; padding:6px 9px; border-radius:8px; color:#527a63; background:#edf4e9; font-size:9px; font-weight:700; letter-spacing:.045em; animation:well-stage-in .35s ease both; }
+.step-progress { height:11px; margin-top:13px; background:#e6eee2; }
+.step-progress span { background:linear-gradient(90deg,#77a68b,#3f795f); }
+.step-remaining { margin-top:9px; color:#698374; font-size:10px; font-weight:600; }
+.steps-history-card { background:#f6f8ee; }
+.compact-daily-list { display:grid; gap:5px; margin-top:8px; }
+.compact-daily-list .well-record { padding:8px 10px; border-color:rgba(213,226,208,.7); background:rgba(255,255,255,.48); }
+.compact-daily-list .well-record-title { color:#6b7f69; font-size:9px; font-weight:500; }
+.compact-daily-list .well-record-value { font-size:10px; }
+.calorie-card { background:#fffaf4; border-color:#eddfd0; }
+.calorie-card .well-icon { color:#a16f49; background:#f7ecdf; }
+.calorie-stat { margin-top:9px; color:#765638; }
+.calorie-card .well-note { color:#927d67; }
+.calorie-progress { background:#f2e6d9; }
+.calorie-progress span { background:linear-gradient(90deg,#d8aa76,#aa704c); }
+.calorie-button { color:#fffaf5; background:#a46e49; }
+.calorie-button:hover:not(:disabled) { background:#87593b; }
+.well-no-target { margin-top:9px; padding:14px; border:1px dashed #e8d6c3; border-radius:13px; background:rgba(255,255,255,.55); }
+.well-no-target strong { color:#805f41; font:600 17px var(--app-font-display,sans-serif); }
+.well-no-target-today { margin-top:8px; color:#785a3e; font:600 13px var(--app-font-display,sans-serif); }
+.well-no-target p { margin:5px 0 0; color:#927d67; font-size:10px; line-height:1.6; }
+.history-switch-row { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:17px; }
+.well-numeric-trend { display:flex; align-items:stretch; gap:4px; width:100%; height:124px; margin:12px 0 4px; padding:7px 2px 0; }
+.calorie-card .well-numeric-trend { height:106px; gap:1px; margin-top:8px; }
+.well-numeric-day { min-width:0; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; }
+.well-numeric-value { min-height:10px; max-width:100%; overflow:hidden; color:#7b927f; font-size:7px; line-height:1; white-space:nowrap; text-overflow:ellipsis; }
+.well-numeric-track { width:min(22px,80%); flex:1; display:flex; align-items:flex-end; overflow:hidden; border-radius:6px 6px 3px 3px; background:rgba(222,233,219,.58); }
+.well-numeric-track i { display:block; width:100%; height:100%; transform-origin:bottom; border-radius:inherit; background:#78a082; transition:transform .45s cubic-bezier(.2,.7,.25,1); }
+.calorie-trend .well-numeric-track { background:rgba(236,221,204,.54); }
+.calorie-trend .well-numeric-track i { background:#c38b5e; }
+.well-numeric-day small { color:#98a398; font-size:7px; line-height:1; }
+.calorie-card .well-numeric-value { font-size:6px; }
+.calorie-card .well-numeric-day small { font-size:6px; }
+.well-estimate-details { margin-top:10px; padding:8px 10px; border:1px solid rgba(211,226,211,.8); border-radius:10px; background:rgba(255,255,255,.48); }
+.well-estimate-details summary { color:#708879; font-size:9px; font-weight:650; cursor:pointer; }
+.well-estimate-details p { margin:7px 0 1px; color:#829388; font-size:9px; line-height:1.65; }
+.calorie-estimate-details { border-color:#eedfce; background:rgba(255,255,255,.55); }
+.calorie-estimate-details summary,.calorie-estimate-details p { color:#8d765f; }
+.compact-shortcuts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.future-insufficient { display:flex; gap:13px; align-items:flex-start; margin:-8px 0 18px; padding:15px 17px; border:1px solid #dce8d9; border-radius:15px; background:#f4f8ef; animation:well-enter .38s ease both; }
+.future-insufficient-mark { flex:none; display:grid; place-items:center; width:32px; height:32px; border-radius:10px; color:#5c8267; background:#e5efe1; }
+.future-insufficient strong { color:#456851; font:600 16px var(--app-font-display,sans-serif); }
+.future-insufficient p { margin:5px 0 0; color:#788c7d; font-size:10px; line-height:1.65; }
+.future-stat-grid { margin-top:12px; }
+.future-stat-grid .well-metric-box { min-width:0; }
+.future-stat-grid .well-metric-box strong { font-size:19px; }
+.future-stat-grid .well-metric-box small { display:block; margin-top:4px; color:#8a9b8c; font-size:8px; }
+.projection-ruler { height:9px; margin:18px 0 8px; overflow:hidden; border-radius:8px; background:rgba(240,247,239,.15); }
+.projection-ruler span { display:block; width:100%; height:100%; transform-origin:left; border-radius:inherit; background:#d8c49c; animation:well-ruler-in .7s cubic-bezier(.2,.7,.25,1) both; }
+.projection-foot { margin-top:10px!important; color:#b3ccb8!important; font-size:9px!important; }
+.experiment-association { margin-top:12px; padding:12px 13px; border-left:2px solid #b6c99f; border-radius:0 11px 11px 0; background:#f3f7ee; }
+.experiment-association > strong { color:#5b755d; font-size:9px; letter-spacing:.09em; text-transform:uppercase; }
+.experiment-association p { margin:5px 0 0; color:#7e8f7e; font-size:9px; line-height:1.55; }
+.experiment-association .experiment-user-notes { margin-top:10px; padding-top:8px; border-top:1px solid #e0e9db; white-space:pre-wrap; }
+.experiment-user-notes span { display:block; margin-bottom:4px; color:#8c9b88; font-size:8px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+.day-progress { color:#597761; background:#e9f0e4; }
+.experiment-rating-chart { margin-top:15px; padding:12px 13px 6px; border:1px solid #e5ece1; border-radius:12px; background:#fbfdf9; }
+.experiment-rating-bars { display:flex; align-items:stretch; gap:7px; height:83px; padding-top:8px; }
+.experiment-rating-point { min-width:0; flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:4px; }
+.experiment-rating-value { color:#759078; font-size:8px; }
+.experiment-rating-point i { display:block; width:min(18px,70%); height:100%; min-height:3px; transform-origin:bottom; border-radius:5px 5px 2px 2px; background:#83a18a; transition:transform .4s ease; }
+.experiment-rating-point small { color:#9ca89a; font-size:7px; }
+.future-timeline { display:grid; justify-items:stretch; gap:7px; max-width:760px; margin:0 auto; }
+.future-milestone { display:grid; grid-template-columns:92px 1fr; align-items:start; gap:14px; padding:16px 18px; border:1px solid #dfe9dc; border-radius:15px; background:rgba(255,255,255,.72); animation:well-enter .4s ease both; }
+.future-milestone:nth-of-type(3) { animation-delay:.08s; }
+.future-milestone:nth-of-type(5) { animation-delay:.16s; }
+.future-milestone-label { display:inline-flex; justify-content:center; padding:7px 9px; border-radius:8px; color:#69806d; background:#eaf1e6; font-size:9px; font-weight:750; letter-spacing:.1em; }
+.future-milestone h3 { margin:0; color:#3c614c; font:600 20px/1.25 var(--app-font-display,sans-serif); letter-spacing:-.025em; }
+.future-milestone p { margin:5px 0 0; color:#829388; font-size:9px; line-height:1.6; }
+.future-timeline-arrow { padding-left:38px; color:#83a187; font-size:18px; line-height:1; }
+.future-pattern-grid .well-card { padding:17px; animation:well-enter .4s ease both; }
+.future-pattern-grid .well-card:nth-child(2) { animation-delay:.07s; }
+.future-pattern-grid .well-card:nth-child(3) { animation-delay:.14s; }
+.future-pattern-grid .well-card p { margin:9px 0 0; color:#788b7d; font-size:10px; line-height:1.65; }
+@keyframes well-stage-in { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+@keyframes well-ruler-in { from { transform:scaleX(0); } to { transform:scaleX(1); } }
 @keyframes well-enter { from { opacity:0; transform:translateY(7px); } to { opacity:1; transform:translateY(0); } }
 @keyframes well-sheen { to { background-position:-200% 0; } }
 @media (max-width: 760px) {
@@ -174,6 +253,12 @@
   .well-meter { grid-template-columns:74px 1fr auto; gap:8px; }
   .well-record { align-items:flex-start; }
   .well-record .well-actions { justify-content:flex-end; }
+  .well-numeric-trend { gap:2px; }
+  .well-numeric-value { font-size:6px; }
+  .future-stat-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .future-milestone { grid-template-columns:72px 1fr; gap:10px; padding:13px; }
+  .future-milestone h3 { font-size:17px; }
+  .history-switch-row { align-items:flex-start; flex-direction:column; }
   .well-chart { height:150px; gap:5px; }
   .well-chart-col small { font-size:7px; }
   .well-table { min-width:520px; }
@@ -185,6 +270,8 @@
   .well-meter { grid-template-columns:66px 1fr; }
   .well-meter strong { grid-column:2; justify-self:end; }
   .well-choice { flex:1; }
+  .future-stat-grid { grid-template-columns:1fr 1fr; }
+  .calorie-card .well-numeric-value { display:none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .wellness *, .wellness *::before, .wellness *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }

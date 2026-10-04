@@ -18,13 +18,18 @@ export function useWellness() {
   const [message, setMessage] = useState('');
   const [mutationError, setMutationError] = useState('');
 
-  const save = (data: WellnessEntryInput, successMessage = 'Saved to your personal record.') => {
+  const save = (
+    data: WellnessEntryInput,
+    successMessage = 'Saved to your personal record.',
+    onSaved?: () => void,
+  ) => {
     setMessage('');
     setMutationError('');
     upsert.mutate({ data }, {
       onSuccess: async () => {
         await client.invalidateQueries({ queryKey: getListWellnessEntriesQueryKey() });
         setMessage(successMessage);
+        onSaved?.();
       },
       onError: () => setMutationError('We couldn’t save that just now. Your details are still here; please try again.'),
     });

@@ -307,6 +307,14 @@ components:
           minItems: 1
           maxItems: 8
           items: { type: string, minLength: 1, maxLength: 80 }
+        checkinMetric:
+          type: string
+          minLength: 1
+          maxLength: 80
+        baselineRating:
+          type: integer
+          minimum: 1
+          maximum: 5
         notes:
           type: string
           maxLength: 1000
@@ -319,6 +327,13 @@ components:
         endedAt:
           type: string
           format: date
+        pausedAt:
+          type: string
+          format: date
+        pausedDays:
+          type: integer
+          minimum: 0
+          maximum: 36500
       required: [title, goal, durationDays, metrics, status, startedAt]
     ExperimentCheckinWellnessData:
       type: object
@@ -334,6 +349,13 @@ components:
           type: integer
           minimum: 1
           maximum: 5
+        phase:
+          type: string
+          enum: [before, during]
+        metric:
+          type: string
+          minLength: 1
+          maxLength: 80
         note:
           type: string
           maxLength: 1000

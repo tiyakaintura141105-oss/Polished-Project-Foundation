@@ -30,9 +30,25 @@ export interface ExperimentWellnessData {
      * @items.maxLength 80
      */
   metrics: string[];
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  checkinMetric?: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  baselineRating?: number;
   /** @maxLength 1000 */
   notes?: string;
   status: ExperimentWellnessDataStatus;
   startedAt: Date;
   endedAt?: Date;
+  pausedAt?: Date;
+  /**
+     * @minimum 0
+     * @maximum 90
+     */
+  pausedDays?: number;
 }

@@ -211,12 +211,36 @@ export interface ExperimentWellnessData {
      * @items.maxLength 80
      */
   metrics: string[];
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  checkinMetric?: string;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  baselineRating?: number;
   /** @maxLength 1000 */
   notes?: string;
   status: ExperimentWellnessDataStatus;
   startedAt: string;
   endedAt?: string;
+  pausedAt?: string;
+  /**
+     * @minimum 0
+     * @maximum 90
+     */
+  pausedDays?: number;
 }
+
+export type ExperimentCheckinWellnessDataPhase = typeof ExperimentCheckinWellnessDataPhase[keyof typeof ExperimentCheckinWellnessDataPhase];
+
+
+export const ExperimentCheckinWellnessDataPhase = {
+  before: 'before',
+  during: 'during',
+} as const;
 
 export interface ExperimentCheckinWellnessData {
   /**
@@ -230,6 +254,12 @@ export interface ExperimentCheckinWellnessData {
      * @maximum 5
      */
   rating: number;
+  phase?: ExperimentCheckinWellnessDataPhase;
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  metric?: string;
   /** @maxLength 1000 */
   note?: string;
 }

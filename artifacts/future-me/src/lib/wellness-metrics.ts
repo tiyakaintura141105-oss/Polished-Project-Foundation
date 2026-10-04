@@ -145,6 +145,169 @@ export function habitProjection(entries: WellnessEntry[], through = localDay()) 
   };
 }
 
+type NumericSummary = {
+  loggedDays: number;
+  average: number | null;
+};
+
+function measurementSummary(
+  entries: WellnessEntry[],
+  kind: WellnessEntryKind,
+  field: string,
+  minimum: number,
+  maximum: number,
+  through: string,
+  allowedValues?: ReadonlySet<number>,
+): NumericSummary {
+  const first = addCalendarDays(through, -29);
+  const values = entriesOfKind(entries, kind)
+    .filter((entry) => entry.date >= first && entry.date <= through)
+    .map((entry) => ({ date: entry.date, value: objectData(entry)[field] }))
+    .filter(
+      (item): item is { date: string; value: number } =>
+        typeof item.value === "number" &&
+        Number.isFinite(item.value) &&
+        Number.isInteger(item.value) &&
+        item.value >= minimum &&
+        item.value <= maximum &&
+        (!allowedValues || allowedValues.has(item.value)),
+    );
+  return {
+    loggedDays: new Set(values.map((item) => item.date)).size,
+    average: values.length
+      ? Math.round(values.reduce((sum, item) => sum + item.value, 0) / values.length)
+      : null,
+  };
+}
+
+export type FutureMeProjection = {
+  enoughData: boolean;
+  sampleDays: number;
+  observedDays: number;
+  projectedRecordDays7: number;
+  projectedRecordDays30: number;
+  steps: NumericSummary & {
+    projectedMovementDays7: number;
+    projectedMovementDays30: number;
+    projectedSteps7: number | null;
+    projectedSteps30: number | null;
+  };
+  calories: NumericSummary;
+  sleep: NumericSummary;
+  energy: NumericSummary;
+  feelings: { loggedDays: number; mostLogged: string | null };
+  experiments: {
+    checkins: number;
+    completed: number;
+    averageRating: number | null;
+  };
+  periodEntries: number;
+};
+
+export function futureMeProjection(
+  entries: WellnessEntry[],
+  through = localDay(),
+  days: number = 30,
+): FutureMeProjection {
+  const safeDays = Number.isInteger(days) && days > 0 ? days : 30;
+  const first = addCalendarDays(through, -(safeDays - 1));
+  const windowEntries = entries.filter(
+    (entry) => entry.date >= first && entry.date <= through,
+  );
+  const observedDays = new Set(windowEntries.map((entry) => entry.date)).size;
+  const steps = measurementSummary(
+    windowEntries,
+    "steps",
+    "count",
+    0,
+    150_000,
+    through,
+  );
+  const calories = measurementSummary(
+    windowEntries,
+    "calories",
+    "count",
+    0,
+    20_000,
+    through,
+  );
+  const sleep = measurementSummary(
+    windowEntries,
+    "sleep",
+    "durationMinutes",
+    0,
+    1_440,
+    through,
+  );
+  const energy = measurementSummary(
+    windowEntries,
+    "energy",
+    "level",
+    10,
+    90,
+    through,
+    new Set([10, 30, 50, 70, 90]),
+  );
+  const feelings = entriesOfKind(windowEntries, "feeling")
+    .map((entry) => objectData(entry).feeling)
+    .filter((feeling): feeling is string => typeof feeling === "string" && feeling.length > 0);
+  const feelingCounts = new Map<string, number>();
+  feelings.forEach((feeling) =>
+    feelingCounts.set(feeling, (feelingCounts.get(feeling) ?? 0) + 1),
+  );
+  const mostLogged = [...feelingCounts.entries()].sort(
+    ([leftLabel, leftCount], [rightLabel, rightCount]) =>
+      rightCount - leftCount || leftLabel.localeCompare(rightLabel),
+  )[0]?.[0] ?? null;
+  const checkins = entriesOfKind(windowEntries, "experiment-checkin").map(objectData);
+  const ratings = checkins
+    .filter((data) => data.phase !== "before")
+    .map((data) => data.rating)
+    .filter(
+      (rating): rating is number =>
+        typeof rating === "number" &&
+        Number.isInteger(rating) &&
+        rating >= 1 &&
+        rating <= 5,
+    );
+  const projectedMovementDays7 = Math.round((steps.loggedDays / safeDays) * 7);
+  const projectedMovementDays30 = Math.round((steps.loggedDays / safeDays) * 30);
+  const movementRate = steps.loggedDays / safeDays;
+
+  return {
+    enoughData: observedDays >= 3,
+    sampleDays: safeDays,
+    observedDays,
+    projectedRecordDays7: Math.round((observedDays / safeDays) * 7),
+    projectedRecordDays30: Math.round((observedDays / safeDays) * 30),
+    steps: {
+      ...steps,
+      projectedMovementDays7,
+      projectedMovementDays30,
+      projectedSteps7: steps.loggedDays >= 3 && steps.average !== null
+        ? Math.round(steps.average * movementRate * 7)
+        : null,
+      projectedSteps30: steps.loggedDays >= 3 && steps.average !== null
+        ? Math.round(steps.average * movementRate * 30)
+        : null,
+    },
+    calories,
+    sleep,
+    energy,
+    feelings: { loggedDays: new Set(
+      entriesOfKind(windowEntries, "feeling").map((entry) => entry.date),
+    ).size, mostLogged },
+    experiments: {
+      checkins: checkins.length,
+      completed: checkins.filter((data) => data.completed === true).length,
+      averageRating: ratings.length
+        ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10
+        : null,
+    },
+    periodEntries: entriesOfKind(windowEntries, "period").length,
+  };
+}
+
 export function loggingConsistency(
   entries: WellnessEntry[],
   days: 7 | 30,

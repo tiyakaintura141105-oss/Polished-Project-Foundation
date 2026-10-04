@@ -9,6 +9,7 @@ import {
   dailySeries,
   energyAction,
   feelingSleepPattern,
+  futureMeProjection,
   habitProjection,
   localDay,
   loggingConsistency,
@@ -69,6 +70,85 @@ test("seven logged days give transparent 7- and 30-day projections", () => {
     projected7Days: 43_400,
     projected30Days: 186_000,
   });
+});
+
+test("Future Me stays empty with zero or one day of data", () => {
+  assert.deepEqual(futureMeProjection([], "2026-10-04").enoughData, false);
+  const oneDay = [
+    entry("steps", "2026-10-04", { count: 6_200 }, 1),
+    entry("sleep", "2026-10-04", { durationMinutes: 420 }, 2),
+  ];
+  const projection = futureMeProjection(oneDay, "2026-10-04");
+  assert.equal(projection.enoughData, false);
+  assert.equal(projection.observedDays, 1);
+  assert.equal(projection.steps.projectedSteps30, null);
+  assert.equal(projection.sleep.average, 420);
+});
+
+test("Future Me summarizes a seven-day sample without filling missing dates", () => {
+  const week = Array.from({ length: 7 }, (_, index) =>
+    entry("steps", addCalendarDays("2026-09-28", index), { count: 6_200 }, index + 1),
+  );
+  const projection = futureMeProjection(week, "2026-10-04");
+  assert.equal(projection.enoughData, true);
+  assert.equal(projection.observedDays, 7);
+  assert.equal(projection.projectedRecordDays7, 2);
+  assert.equal(projection.projectedRecordDays30, 7);
+  assert.equal(projection.steps.average, 6_200);
+  assert.equal(projection.steps.projectedMovementDays30, 7);
+  assert.equal(projection.steps.projectedSteps30, 43_400);
+
+  const weekOnly = futureMeProjection(week, "2026-10-04", 7);
+  assert.equal(weekOnly.sampleDays, 7);
+  assert.equal(weekOnly.projectedRecordDays7, 7);
+  assert.equal(weekOnly.projectedRecordDays30, 30);
+  assert.equal(weekOnly.steps.projectedSteps7, 43_400);
+  assert.equal(weekOnly.steps.projectedSteps30, 186_000);
+});
+
+test("Future Me summarizes sparse calorie, sleep, feeling and experiment data from present values only", () => {
+  const entries = [
+    entry("calories", "2026-09-29", { count: 1_800 }, 1),
+    entry("calories", "2026-10-02", { count: 2_100 }, 2),
+    entry("sleep", "2026-10-02", { durationMinutes: 455 }, 3),
+    entry("feeling", "2026-10-02", { feeling: "tired", intensity: 4 }, 4),
+    entry("feeling", "2026-10-04", { feeling: "tired", intensity: 5 }, 5),
+    entry("experiment-checkin", "2026-10-04", {
+      experimentKey: "walk",
+      completed: true,
+      rating: 4,
+    }, 6),
+  ];
+  const projection = futureMeProjection(entries, "2026-10-04");
+  assert.equal(projection.observedDays, 3);
+  assert.equal(projection.calories.loggedDays, 2);
+  assert.equal(projection.calories.average, 1_950);
+  assert.equal(projection.sleep.average, 455);
+  assert.equal(projection.feelings.loggedDays, 2);
+  assert.equal(projection.feelings.mostLogged, "tired");
+  assert.equal(projection.experiments.checkins, 1);
+  assert.equal(projection.experiments.completed, 1);
+  assert.equal(projection.experiments.averageRating, 4);
+});
+
+test("Future Me excludes out-of-range measurements and records missing values as absent", () => {
+  const entries = [
+    entry("steps", "2026-09-28", { count: 4_000 }, 1),
+    entry("steps", "2026-09-29", { count: 150_001 }, 2),
+    entry("steps", "2026-09-30", { count: -1 }, 3),
+    entry("calories", "2026-09-28", { count: 20_001 }, 4),
+    entry("calories", "2026-09-29", { count: 0 }, 5),
+    entry("energy", "2026-09-30", { level: 11 }, 6),
+    entry("energy", "2026-10-01", { level: 70 }, 7),
+  ];
+  const projection = futureMeProjection(entries, "2026-10-04");
+  assert.equal(projection.steps.loggedDays, 1);
+  assert.equal(projection.steps.average, 4_000);
+  assert.equal(projection.steps.projectedSteps30, null);
+  assert.equal(projection.calories.loggedDays, 1);
+  assert.equal(projection.calories.average, 0);
+  assert.equal(projection.energy.loggedDays, 1);
+  assert.equal(projection.energy.average, 70);
 });
 
 test("incomplete and missing dates remain missing rather than being fabricated as zero", () => {

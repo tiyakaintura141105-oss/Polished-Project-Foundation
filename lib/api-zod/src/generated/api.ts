@@ -167,11 +167,20 @@ export const upsertWellnessEntryBodyDataSixMetricsItemMax = 80;
 
 export const upsertWellnessEntryBodyDataSixMetricsMax = 8;
 
+export const upsertWellnessEntryBodyDataSixCheckinMetricMax = 80;
+
+export const upsertWellnessEntryBodyDataSixBaselineRatingMax = 5;
+
 export const upsertWellnessEntryBodyDataSixNotesMax = 1000;
+
+export const upsertWellnessEntryBodyDataSixPausedDaysMin = 0;
+export const upsertWellnessEntryBodyDataSixPausedDaysMax = 90;
 
 export const upsertWellnessEntryBodyDataSevenExperimentKeyMax = 120;
 
 export const upsertWellnessEntryBodyDataSevenRatingMax = 5;
+
+export const upsertWellnessEntryBodyDataSevenMetricMax = 80;
 
 export const upsertWellnessEntryBodyDataSevenNoteMax = 1000;
 
@@ -218,14 +227,20 @@ export const UpsertWellnessEntryBody = zod.object({
   "goal": zod.string().min(1).max(upsertWellnessEntryBodyDataSixGoalMax),
   "durationDays": zod.number().int().min(1).max(upsertWellnessEntryBodyDataSixDurationDaysMax),
   "metrics": zod.array(zod.string().min(1).max(upsertWellnessEntryBodyDataSixMetricsItemMax)).min(1).max(upsertWellnessEntryBodyDataSixMetricsMax),
+  "checkinMetric": zod.string().min(1).max(upsertWellnessEntryBodyDataSixCheckinMetricMax).optional(),
+  "baselineRating": zod.number().int().min(1).max(upsertWellnessEntryBodyDataSixBaselineRatingMax).optional(),
   "notes": zod.string().max(upsertWellnessEntryBodyDataSixNotesMax).optional(),
   "status": zod.enum(['active', 'paused', 'completed', 'cancelled']),
   "startedAt": zod.coerce.date(),
-  "endedAt": zod.coerce.date().optional()
+  "endedAt": zod.coerce.date().optional(),
+  "pausedAt": zod.coerce.date().optional(),
+  "pausedDays": zod.number().int().min(upsertWellnessEntryBodyDataSixPausedDaysMin).max(upsertWellnessEntryBodyDataSixPausedDaysMax).optional()
 }),zod.object({
   "experimentKey": zod.string().min(1).max(upsertWellnessEntryBodyDataSevenExperimentKeyMax),
   "completed": zod.boolean(),
   "rating": zod.number().int().min(1).max(upsertWellnessEntryBodyDataSevenRatingMax),
+  "phase": zod.enum(['before', 'during']).optional(),
+  "metric": zod.string().min(1).max(upsertWellnessEntryBodyDataSevenMetricMax).optional(),
   "note": zod.string().max(upsertWellnessEntryBodyDataSevenNoteMax).optional()
 }),zod.object({
   "startDate": zod.coerce.date(),
