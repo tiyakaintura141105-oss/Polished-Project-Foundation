@@ -74,3 +74,217 @@ export interface MyProfileResponse {
   profile: Profile | null;
 }
 
+export type WellnessEntryKind = typeof WellnessEntryKind[keyof typeof WellnessEntryKind];
+
+
+export const WellnessEntryKind = {
+  steps: 'steps',
+  calories: 'calories',
+  sleep: 'sleep',
+  energy: 'energy',
+  feeling: 'feeling',
+  experiment: 'experiment',
+  'experiment-checkin': 'experiment-checkin',
+  period: 'period',
+} as const;
+
+export interface StepsWellnessData {
+  /**
+     * @minimum 0
+     * @maximum 150000
+     */
+  count: number;
+}
+
+export interface CaloriesWellnessData {
+  /**
+     * @minimum 0
+     * @maximum 20000
+     */
+  count: number;
+}
+
+export interface SleepWellnessData {
+  /** @pattern ^\d{2}:\d{2}$ */
+  bedtime: string;
+  /** @pattern ^\d{2}:\d{2}$ */
+  wakeTime: string;
+  /**
+     * @minimum 0
+     * @maximum 1440
+     */
+  durationMinutes: number;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  quality: number;
+  /**
+     * @minimum 0
+     * @maximum 600
+     */
+  napMinutes?: number;
+  /**
+     * @minimum 180
+     * @maximum 720
+     */
+  referenceTargetMinutes?: number;
+}
+
+export type EnergyWellnessDataLevel = typeof EnergyWellnessDataLevel[keyof typeof EnergyWellnessDataLevel];
+
+
+export const EnergyWellnessDataLevel = {
+  NUMBER_10: 10,
+  NUMBER_30: 30,
+  NUMBER_50: 50,
+  NUMBER_70: 70,
+  NUMBER_90: 90,
+} as const;
+
+export interface EnergyWellnessData {
+  level: EnergyWellnessDataLevel;
+  /**
+     * @minLength 1
+     * @maxLength 160
+     */
+  action: string;
+  completed: boolean;
+}
+
+export type FeelingWellnessDataFeeling = typeof FeelingWellnessDataFeeling[keyof typeof FeelingWellnessDataFeeling];
+
+
+export const FeelingWellnessDataFeeling = {
+  tired: 'tired',
+  stressed: 'stressed',
+  low_mood: 'low mood',
+  energetic: 'energetic',
+  bloated: 'bloated',
+  headache: 'headache',
+  poor_focus: 'poor focus',
+  good: 'good',
+  other: 'other',
+} as const;
+
+export interface FeelingWellnessData {
+  feeling: FeelingWellnessDataFeeling;
+  /**
+     * @minimum 1
+     * @maximum 10
+     */
+  intensity: number;
+  /** @maxLength 1000 */
+  note?: string;
+}
+
+export type ExperimentWellnessDataStatus = typeof ExperimentWellnessDataStatus[keyof typeof ExperimentWellnessDataStatus];
+
+
+export const ExperimentWellnessDataStatus = {
+  active: 'active',
+  paused: 'paused',
+  completed: 'completed',
+  cancelled: 'cancelled',
+} as const;
+
+export interface ExperimentWellnessData {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  title: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  goal: string;
+  /**
+     * @minimum 1
+     * @maximum 90
+     */
+  durationDays: number;
+  /**
+     * @minItems 1
+     * @maxItems 8
+     * @items.minLength 1
+     * @items.maxLength 80
+     */
+  metrics: string[];
+  /** @maxLength 1000 */
+  notes?: string;
+  status: ExperimentWellnessDataStatus;
+  startedAt: string;
+  endedAt?: string;
+}
+
+export interface ExperimentCheckinWellnessData {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  experimentKey: string;
+  completed: boolean;
+  /**
+     * @minimum 1
+     * @maximum 5
+     */
+  rating: number;
+  /** @maxLength 1000 */
+  note?: string;
+}
+
+export interface PeriodWellnessData {
+  startDate: string;
+  endDate?: string;
+  /**
+     * @minimum 15
+     * @maximum 90
+     */
+  cycleLength?: number;
+  /** @maxLength 120 */
+  flow?: string;
+  /**
+     * @maxItems 20
+     * @items.maxLength 80
+     */
+  symptoms?: string[];
+  /** @maxLength 80 */
+  mood?: string;
+  /** @maxLength 1000 */
+  notes?: string;
+}
+
+export interface WellnessEntryInput {
+  /**
+     * @minLength 1
+     * @maxLength 120
+     */
+  key: string;
+  kind: WellnessEntryKind;
+  date: string;
+  data: StepsWellnessData | CaloriesWellnessData | SleepWellnessData | EnergyWellnessData | FeelingWellnessData | ExperimentWellnessData | ExperimentCheckinWellnessData | PeriodWellnessData;
+}
+
+export type WellnessEntryData = { [key: string]: unknown };
+
+export interface WellnessEntry {
+  id: number;
+  key: string;
+  kind: WellnessEntryKind;
+  date: string;
+  data: WellnessEntryData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WellnessEntriesResponse {
+  entries: WellnessEntry[];
+}
+
+export type ListWellnessEntriesParams = {
+from?: string;
+to?: string;
+kind?: WellnessEntryKind;
+};
+

@@ -105,3 +105,161 @@ export const SaveMyProfileResponse = zod.object({
 }))
 
 
+/**
+ * @summary List the signed-in user's wellness entries
+ */
+export const ListWellnessEntriesQueryParams = zod.object({
+  "from": zod.date().optional(),
+  "to": zod.date().optional(),
+  "kind": zod.enum(['steps', 'calories', 'sleep', 'energy', 'feeling', 'experiment', 'experiment-checkin', 'period']).optional()
+})
+
+export const ListWellnessEntriesResponse = zod.object({
+  "entries": zod.array(zod.object({
+  "id": zod.number().int(),
+  "key": zod.string(),
+  "kind": zod.enum(['steps', 'calories', 'sleep', 'energy', 'feeling', 'experiment', 'experiment-checkin', 'period']),
+  "date": zod.coerce.date(),
+  "data": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Create or update one of the signed-in user's wellness entries
+ */
+export const upsertWellnessEntryBodyKeyMax = 120;
+
+export const upsertWellnessEntryBodyDataOneCountMin = 0;
+export const upsertWellnessEntryBodyDataOneCountMax = 150000;
+
+export const upsertWellnessEntryBodyDataTwoCountMin = 0;
+export const upsertWellnessEntryBodyDataTwoCountMax = 20000;
+
+export const upsertWellnessEntryBodyDataThreeBedtimeRegExp = new RegExp('^\\d{2}:\\d{2}$');
+export const upsertWellnessEntryBodyDataThreeWakeTimeRegExp = new RegExp('^\\d{2}:\\d{2}$');
+export const upsertWellnessEntryBodyDataThreeDurationMinutesMin = 0;
+export const upsertWellnessEntryBodyDataThreeDurationMinutesMax = 1440;
+
+export const upsertWellnessEntryBodyDataThreeQualityMax = 5;
+
+export const upsertWellnessEntryBodyDataThreeNapMinutesMin = 0;
+export const upsertWellnessEntryBodyDataThreeNapMinutesMax = 600;
+
+export const upsertWellnessEntryBodyDataThreeReferenceTargetMinutesMin = 180;
+export const upsertWellnessEntryBodyDataThreeReferenceTargetMinutesMax = 720;
+
+export const upsertWellnessEntryBodyDataFourActionMax = 160;
+
+export const upsertWellnessEntryBodyDataFiveIntensityMax = 10;
+
+export const upsertWellnessEntryBodyDataFiveNoteMax = 1000;
+
+export const upsertWellnessEntryBodyDataSixTitleMax = 120;
+
+export const upsertWellnessEntryBodyDataSixGoalMax = 500;
+
+export const upsertWellnessEntryBodyDataSixDurationDaysMax = 90;
+
+export const upsertWellnessEntryBodyDataSixMetricsItemMax = 80;
+
+export const upsertWellnessEntryBodyDataSixMetricsMax = 8;
+
+export const upsertWellnessEntryBodyDataSixNotesMax = 1000;
+
+export const upsertWellnessEntryBodyDataSevenExperimentKeyMax = 120;
+
+export const upsertWellnessEntryBodyDataSevenRatingMax = 5;
+
+export const upsertWellnessEntryBodyDataSevenNoteMax = 1000;
+
+export const upsertWellnessEntryBodyDataEightCycleLengthMin = 15;
+export const upsertWellnessEntryBodyDataEightCycleLengthMax = 90;
+
+export const upsertWellnessEntryBodyDataEightFlowMax = 120;
+
+export const upsertWellnessEntryBodyDataEightSymptomsItemMax = 80;
+
+export const upsertWellnessEntryBodyDataEightSymptomsMax = 20;
+
+export const upsertWellnessEntryBodyDataEightMoodMax = 80;
+
+export const upsertWellnessEntryBodyDataEightNotesMax = 1000;
+
+
+
+export const UpsertWellnessEntryBody = zod.object({
+  "key": zod.string().min(1).max(upsertWellnessEntryBodyKeyMax),
+  "kind": zod.enum(['steps', 'calories', 'sleep', 'energy', 'feeling', 'experiment', 'experiment-checkin', 'period']),
+  "date": zod.coerce.date(),
+  "data": zod.union([zod.object({
+  "count": zod.number().int().min(upsertWellnessEntryBodyDataOneCountMin).max(upsertWellnessEntryBodyDataOneCountMax)
+}),zod.object({
+  "count": zod.number().int().min(upsertWellnessEntryBodyDataTwoCountMin).max(upsertWellnessEntryBodyDataTwoCountMax)
+}),zod.object({
+  "bedtime": zod.string().regex(upsertWellnessEntryBodyDataThreeBedtimeRegExp),
+  "wakeTime": zod.string().regex(upsertWellnessEntryBodyDataThreeWakeTimeRegExp),
+  "durationMinutes": zod.number().int().min(upsertWellnessEntryBodyDataThreeDurationMinutesMin).max(upsertWellnessEntryBodyDataThreeDurationMinutesMax),
+  "quality": zod.number().int().min(1).max(upsertWellnessEntryBodyDataThreeQualityMax),
+  "napMinutes": zod.number().int().min(upsertWellnessEntryBodyDataThreeNapMinutesMin).max(upsertWellnessEntryBodyDataThreeNapMinutesMax).optional(),
+  "referenceTargetMinutes": zod.number().int().min(upsertWellnessEntryBodyDataThreeReferenceTargetMinutesMin).max(upsertWellnessEntryBodyDataThreeReferenceTargetMinutesMax).optional()
+}),zod.object({
+  "level": zod.union([zod.literal(10),zod.literal(30),zod.literal(50),zod.literal(70),zod.literal(90)]),
+  "action": zod.string().min(1).max(upsertWellnessEntryBodyDataFourActionMax),
+  "completed": zod.boolean()
+}),zod.object({
+  "feeling": zod.enum(['tired', 'stressed', 'low mood', 'energetic', 'bloated', 'headache', 'poor focus', 'good', 'other']),
+  "intensity": zod.number().int().min(1).max(upsertWellnessEntryBodyDataFiveIntensityMax),
+  "note": zod.string().max(upsertWellnessEntryBodyDataFiveNoteMax).optional()
+}),zod.object({
+  "title": zod.string().min(1).max(upsertWellnessEntryBodyDataSixTitleMax),
+  "goal": zod.string().min(1).max(upsertWellnessEntryBodyDataSixGoalMax),
+  "durationDays": zod.number().int().min(1).max(upsertWellnessEntryBodyDataSixDurationDaysMax),
+  "metrics": zod.array(zod.string().min(1).max(upsertWellnessEntryBodyDataSixMetricsItemMax)).min(1).max(upsertWellnessEntryBodyDataSixMetricsMax),
+  "notes": zod.string().max(upsertWellnessEntryBodyDataSixNotesMax).optional(),
+  "status": zod.enum(['active', 'paused', 'completed', 'cancelled']),
+  "startedAt": zod.coerce.date(),
+  "endedAt": zod.coerce.date().optional()
+}),zod.object({
+  "experimentKey": zod.string().min(1).max(upsertWellnessEntryBodyDataSevenExperimentKeyMax),
+  "completed": zod.boolean(),
+  "rating": zod.number().int().min(1).max(upsertWellnessEntryBodyDataSevenRatingMax),
+  "note": zod.string().max(upsertWellnessEntryBodyDataSevenNoteMax).optional()
+}),zod.object({
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date().optional(),
+  "cycleLength": zod.number().int().min(upsertWellnessEntryBodyDataEightCycleLengthMin).max(upsertWellnessEntryBodyDataEightCycleLengthMax).optional(),
+  "flow": zod.string().max(upsertWellnessEntryBodyDataEightFlowMax).optional(),
+  "symptoms": zod.array(zod.string().max(upsertWellnessEntryBodyDataEightSymptomsItemMax)).max(upsertWellnessEntryBodyDataEightSymptomsMax).optional(),
+  "mood": zod.string().max(upsertWellnessEntryBodyDataEightMoodMax).optional(),
+  "notes": zod.string().max(upsertWellnessEntryBodyDataEightNotesMax).optional()
+})])
+})
+
+export const UpsertWellnessEntryResponse = zod.object({
+  "id": zod.number().int(),
+  "key": zod.string(),
+  "kind": zod.enum(['steps', 'calories', 'sleep', 'energy', 'feeling', 'experiment', 'experiment-checkin', 'period']),
+  "date": zod.coerce.date(),
+  "data": zod.record(zod.string(), zod.unknown()),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Delete one of the signed-in user's wellness entries
+ */
+export const deleteWellnessEntryPathEntryKeyMax = 120;
+
+
+
+export const DeleteWellnessEntryParams = zod.object({
+  "entryKey": zod.coerce.string().min(1).max(deleteWellnessEntryPathEntryKeyMax)
+})
+
+export const DeleteWellnessEntryResponse = zod.void()
+
+

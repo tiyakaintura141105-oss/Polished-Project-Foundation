@@ -21,9 +21,13 @@ import type {
 
 import type {
   HealthStatus,
+  ListWellnessEntriesParams,
   MyProfileResponse,
   Profile,
-  ProfileInput
+  ProfileInput,
+  WellnessEntriesResponse,
+  WellnessEntry,
+  WellnessEntryInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -294,5 +298,251 @@ export const useSaveMyProfile = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getSaveMyProfileMutationOptions(options));
+    }
+
+export const getListWellnessEntriesUrl = (params?: ListWellnessEntriesParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/wellness/entries?${stringifiedParams}` : `/api/wellness/entries`
+}
+
+/**
+ * @summary List the signed-in user's wellness entries
+ */
+export const listWellnessEntries = async (params?: ListWellnessEntriesParams, options?: Parameters<typeof customFetch>[1]): Promise<WellnessEntriesResponse> => {
+
+  return customFetch<WellnessEntriesResponse>(getListWellnessEntriesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListWellnessEntriesQueryKey = (params?: ListWellnessEntriesParams,) => {
+    return [
+    `/api/wellness/entries`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListWellnessEntriesQueryOptions = <TData = Awaited<ReturnType<typeof listWellnessEntries>>, TError = ErrorType<void>>(params?: ListWellnessEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWellnessEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListWellnessEntriesQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listWellnessEntries>>> = ({ signal }) => listWellnessEntries(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listWellnessEntries>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListWellnessEntriesQueryResult = NonNullable<Awaited<ReturnType<typeof listWellnessEntries>>>
+export type ListWellnessEntriesQueryError = ErrorType<void>
+
+
+/**
+ * @summary List the signed-in user's wellness entries
+ */
+
+export function useListWellnessEntries<TData = Awaited<ReturnType<typeof listWellnessEntries>>, TError = ErrorType<void>>(
+ params?: ListWellnessEntriesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listWellnessEntries>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListWellnessEntriesQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpsertWellnessEntryUrl = () => {
+
+
+
+
+  return `/api/wellness/entries`
+}
+
+/**
+ * @summary Create or update one of the signed-in user's wellness entries
+ */
+export const upsertWellnessEntry = async (wellnessEntryInput: WellnessEntryInput, options?: Parameters<typeof customFetch>[1]): Promise<WellnessEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WellnessEntry>(getUpsertWellnessEntryUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(wellnessEntryInput)
+  }
+);}
+
+
+
+
+
+export const getUpsertWellnessEntryMutationKey = () => ['upsertWellnessEntry'] as const;
+
+export const getUpsertWellnessEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertWellnessEntry>>, TError,UpsertWellnessEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof upsertWellnessEntry>>, TError,UpsertWellnessEntryMutationVariables, TContext> => {
+
+const mutationKey = getUpsertWellnessEntryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof upsertWellnessEntry>>, UpsertWellnessEntryMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  upsertWellnessEntry(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpsertWellnessEntryMutationResult = NonNullable<Awaited<ReturnType<typeof upsertWellnessEntry>>>
+    export type UpsertWellnessEntryMutationBody = BodyType<WellnessEntryInput>
+    export type UpsertWellnessEntryMutationError = ErrorType<void>
+    export type UpsertWellnessEntryMutationVariables = {data: BodyType<WellnessEntryInput>}
+
+    /**
+ * @summary Create or update one of the signed-in user's wellness entries
+ */
+export const useUpsertWellnessEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof upsertWellnessEntry>>, TError,UpsertWellnessEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof upsertWellnessEntry>>,
+        TError,
+        UpsertWellnessEntryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpsertWellnessEntryMutationOptions(options));
+    }
+
+export const getDeleteWellnessEntryUrl = (entryKey: string,) => {
+
+
+
+
+  return `/api/wellness/entries/${entryKey}`
+}
+
+/**
+ * @summary Delete one of the signed-in user's wellness entries
+ */
+export const deleteWellnessEntry = async (entryKey: string, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteWellnessEntryUrl(entryKey),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteWellnessEntryMutationKey = () => ['deleteWellnessEntry'] as const;
+
+export const getDeleteWellnessEntryMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWellnessEntry>>, TError,DeleteWellnessEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteWellnessEntry>>, TError,DeleteWellnessEntryMutationVariables, TContext> => {
+
+const mutationKey = getDeleteWellnessEntryMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteWellnessEntry>>, DeleteWellnessEntryMutationVariables> = (props) => {
+          const {entryKey} = props ?? {};
+
+          return  deleteWellnessEntry(entryKey,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteWellnessEntryMutationResult = NonNullable<Awaited<ReturnType<typeof deleteWellnessEntry>>>
+
+    export type DeleteWellnessEntryMutationError = ErrorType<void>
+    export type DeleteWellnessEntryMutationVariables = {entryKey: string}
+
+    /**
+ * @summary Delete one of the signed-in user's wellness entries
+ */
+export const useDeleteWellnessEntry = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteWellnessEntry>>, TError,DeleteWellnessEntryMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteWellnessEntry>>,
+        TError,
+        DeleteWellnessEntryMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteWellnessEntryMutationOptions(options));
     }
 

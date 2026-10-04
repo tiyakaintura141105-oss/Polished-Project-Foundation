@@ -1,0 +1,747 @@
+Now implement the Steps and Calories features completely.
+
+STEP TRACKER:
+
+Create a dedicated Steps section on the Home dashboard.
+
+Display:
+- Today's steps
+- Today's personalized target
+- Steps remaining
+- Percentage completed
+- Visual progress indicator
+- Weekly step trend
+- Recent daily totals
+
+Allow the user to manually enter/update today's step count.
+
+PERSONALIZED STEP GOAL:
+Create a transparent estimation system using available profile information such as:
+- age
+- height
+- weight
+- sex
+- goal
+- activity level
+
+Do not claim the calculation is medically optimal.
+Present it as a personalized wellness target/estimate.
+
+The goal must be clearly displayed.
+
+Example:
+6,240 / 8,000 steps
+1,760 steps remaining
+
+Add motivational messaging that changes based on progress:
+- Just getting started
+- Good progress
+- Almost there
+- Goal completed
+
+CALORIE TRACKER:
+
+Create:
+- Daily calorie target estimate
+- Calories logged today
+- Remaining calories
+- Daily progress
+- 7-day history
+- 30-day history
+
+Allow users to manually enter calorie intake for the day.
+
+PROFILE-BASED ESTIMATE:
+Use age, sex, height, weight, activity level and goal to create an estimated calorie target.
+
+Clearly label it:
+“Estimated daily calorie target”
+
+Do NOT:
+- Claim exact calorie requirements
+- Guarantee weight loss/gain
+- Give medical nutrition advice
+
+Allow users to edit their profile later and recalculate estimates.
+
+UI:
+Steps and Calories should look visually different but belong to the same design system.
+
+Make the experience highly intuitive and mobile-friendly.
+
+Persist all entries in the database.
+
+Add:
+- loading state
+- empty state
+- validation
+- save confirmation
+- error handling
+
+Run tests and fix all errors.
+next feature:
+Now implement the core differentiating feature: “Future Me”.
+
+IMPORTANT:
+Future Me is NOT a medical prediction engine.
+
+Its purpose is to help users understand what their current habits may look like if maintained over time.
+
+Create a dedicated Future Me section on the Home dashboard and a detailed Future Me page.
+
+INPUT DATA:
+Use available user data such as:
+- steps
+- calorie logging consistency
+- sleep data
+- wellness experiment results
+- energy levels
+- symptoms/feelings logs
+- period data when available
+
+The system should analyze recent logged behavior and generate transparent habit projections.
+
+EXAMPLE:
+If a user averages 6,200 steps/day over the last 7 days:
+
+“Your current average is 6,200 steps/day.
+If this continues for the next 30 days, you would accumulate approximately 186,000 steps.”
+
+Do similar projections for:
+- consistency
+- activity
+- logging behavior
+- sleep consistency where data exists
+
+IMPORTANT:
+Do not predict:
+- exact future weight
+- disease
+- medical conditions
+- guaranteed physical outcomes
+
+Instead show:
+- projected activity
+- projected consistency
+- likely habit continuation
+- areas that may need attention
+
+Create a visual “Future Me” timeline:
+
+TODAY
+↓
+7 DAYS
+↓
+30 DAYS
+
+Example:
+TODAY
+6,200 avg steps
+
+7 DAYS
+43,400 projected steps
+
+30 DAYS
+186,000 projected steps
+
+Add a section:
+“What is shaping your Future Me?”
+
+Show the user's strongest recent patterns.
+
+Example:
+- Activity: improving
+- Sleep consistency: needs attention
+- Nutrition logging: strong
+- Wellness experiment consistency: moderate
+
+Create:
+1. Positive pattern
+2. Biggest opportunity
+3. One small action for tomorrow
+
+The interface should feel exciting and personalized.
+
+Use tasteful animations:
+- number count-up
+- timeline reveal
+- progress animation
+
+Do not overdo animation.
+
+Make calculations deterministic and explainable.
+Do not invent data.
+
+If there isn't enough data:
+show:
+“Your Future Me becomes smarter as you log more.”
+
+Then recommend the next useful action.
+
+Persist and retrieve all relevant user data.
+Test extensively with:
+- zero data
+- one day of data
+- seven days of data
+- incomplete data
+- unusual values
+
+Fix all issues.
+next feature:
+Now build “Personal Wellness Experiments”.
+
+Concept:
+Users can test small lifestyle changes on themselves for a defined period and compare their experience before and during the experiment.
+
+Examples:
+- Stop caffeine after 2 PM
+- 20-minute walk every day
+- Drink more water
+- Sleep at a consistent time
+- 5-minute evening wind-down
+
+IMPORTANT:
+These are wellness experiments, not medical experiments.
+
+FEATURES:
+
+Experiment creation:
+- Choose experiment template OR create custom experiment
+- Experiment name
+- Goal
+- Duration
+- Daily check-in metric
+- Optional notes
+
+Example:
+“Stop caffeine after 2 PM”
+Duration: 7 days
+Track:
+- sleep quality
+- energy
+- mood
+
+Daily check-in:
+- completed / not completed
+- simple rating
+- optional note
+
+Experiment dashboard:
+- Current experiment
+- Day X of Y
+- Completion rate
+- Trend chart
+- Notes
+
+Experiment completion:
+Compare:
+- Before experiment
+- During experiment
+
+Show observations carefully:
+“Your average sleep rating was higher during the experiment.”
+
+Do not say:
+“This proves caffeine caused better sleep.”
+
+Use language such as:
+“Your logged data shows an association.”
+
+Create a beautiful experiment card and progress experience.
+
+Allow:
+- start
+- pause
+- complete
+- cancel
+
+Persist everything.
+
+Add empty states and validation.
+
+Test all flows.
+next feature:
+Now implement two major features.
+
+FEATURE 1: SLEEP DEBT RECOVERY
+
+Purpose:
+Help users recover from inconsistent or insufficient sleep without making medical claims.
+
+Allow users to log:
+- bedtime
+- wake time
+- total sleep duration
+- sleep quality
+- optional daytime nap
+
+Create:
+- recent sleep average
+- sleep consistency
+- simple “sleep debt” estimate based on a user-defined/reference sleep target
+
+IMPORTANT:
+Call this an estimate, not a medical measurement.
+
+Recovery suggestions should be practical and conservative:
+- earlier bedtime
+- consistent wake time
+- short daytime recovery suggestions
+- reduce late caffeine
+- wind-down period
+
+Do not recommend extreme sleep schedules.
+
+Create a recovery dashboard:
+“Your recent sleep”
+“Your recovery trend”
+“Tonight's small goal”
+
+FEATURE 2: 5-MINUTE VERSION OF ME
+
+Concept:
+The app adapts the user's wellness plan based on how much energy they have today.
+
+At the start of the feature:
+“How much energy do you have today?”
+
+Choices:
+- 10%
+- 30%
+- 50%
+- 70%
+- 90%
+
+Based on energy level, recommend appropriate wellness actions.
+
+Examples:
+
+10%
+- Drink water
+- 2-minute stretch
+- 5-minute breathing/reset
+
+30%
+- 5-minute walk
+- stretch
+- simple healthy meal suggestion
+
+50%
+- 10–15 minute movement
+- short outdoor walk
+
+70–90%
+- longer workout
+- walk
+- meal preparation
+- wellness experiment check-in
+
+IMPORTANT:
+Do not shame users.
+Never say they are “lazy”.
+The philosophy should be:
+
+“Do what matches your energy today.”
+
+Create:
+- energy selection
+- recommended 5-minute action
+- completion button
+- daily history
+- consistency tracking
+
+Integrate this with Future Me so completed actions contribute to the user's overall wellness consistency.
+
+Test everything.
+Now implement “Why Do I Feel Like This?”
+
+Concept:
+Users can record how they feel, then compare that feeling with their recently logged lifestyle data to identify possible patterns.
+
+This feature MUST NOT diagnose the user.
+
+SCREEN:
+
+“How are you feeling?”
+
+Allow selection of:
+- tired
+- stressed
+- low mood
+- energetic
+- bloated
+- headache
+- poor focus
+- good
+- other
+
+Also allow:
+- intensity from 1–10
+- optional note
+
+Then compare the entry with available recent data:
+- sleep
+- steps
+- calories/logging consistency
+- energy
+- experiments
+- period data for female users where appropriate
+
+Example output:
+
+“You reported feeling tired today.”
+
+“Recent pattern:
+You reported tiredness on 3 days this week.
+On 2 of those days, your logged sleep was below your recent average.”
+
+Then:
+“Possible pattern to watch:
+Lower sleep may be associated with how you reported feeling.”
+
+IMPORTANT:
+Never say:
+“Your tiredness is caused by lack of sleep.”
+
+Instead use:
+“Your logs show a pattern worth watching.”
+
+Create:
+- feeling history
+- pattern summaries
+- trend visualization
+- personal observations
+
+Make the feature feel like a calm personal detective rather than a medical diagnosis tool.
+
+If insufficient data exists:
+“Keep logging for a few more days and we'll look for patterns.”
+
+Connect useful findings to:
+- Sleep Debt Recovery
+- 5-Minute Version of Me
+- Wellness Experiments
+- Future Me
+
+Persist all entries.
+
+Test edge cases and incomplete data.
+Now implement the Periods feature for female profiles only.
+
+IMPORTANT:
+Male users must not see this feature in their dashboard or navigation.
+
+Create a private menstrual cycle tracking section.
+
+Allow:
+- period start date
+- period end date
+- cycle length
+- flow notes
+- symptoms
+- mood
+- optional notes
+
+Show:
+- current cycle day
+- estimated next period
+- cycle history
+- symptom history
+
+The app should clearly label predictions as estimates.
+
+Do not make medical claims.
+
+Female users should receive a dedicated but visually consistent experience.
+
+Integrate period information carefully with:
+- Why Do I Feel Like This?
+- History
+- Insights
+
+Only use cycle data where it is relevant and do not automatically infer medical conditions.
+
+Ensure privacy-sensitive information is stored securely and only shown to the authenticated user.
+
+Test:
+- female user
+- male user
+- missing cycle data
+- irregular cycle lengths
+- editing previous entries
+
+Fix all issues.
+Now build the History and Insights system.
+
+HISTORY:
+
+Create a chronological health/wellness history showing:
+- steps
+- calories
+- sleep
+- energy
+- feelings
+- wellness experiments
+- period data for female users
+
+Allow users to switch:
+- 7 days
+- 30 days
+
+INSIGHTS:
+
+Create an intelligent but explainable insights page.
+
+Sections:
+
+1. Activity
+2. Nutrition logging
+3. Sleep
+4. Energy
+5. Feelings
+6. Wellness experiments
+7. Period-related patterns for female users
+
+Show trends through attractive charts.
+
+Use simple language.
+
+Examples:
+“Your average steps increased this week.”
+
+“You logged your meals on 6 of the last 7 days.”
+
+“Your sleep timing was more consistent this week.”
+
+“Your energy was highest on days when your sleep was closer to your recent average.”
+
+Avoid unsupported causation.
+
+Create:
+- strongest positive change
+- biggest opportunity
+- most consistent habit
+- one recommended focus for next week
+
+Connect the insights directly to Future Me.
+
+For example:
+“Improving sleep consistency is currently your biggest opportunity.”
+
+Then:
+“Try Sleep Debt Recovery.”
+
+Make the page visually impressive without becoming cluttered.
+
+Test all charts with:
+- no data
+- one data point
+- normal data
+- missing fields
+
+Fix all issues.
+Now perform a complete professional UI/UX redesign pass across the entire Future Me application.
+
+IMPORTANT:
+Do NOT add random features.
+Do NOT change the core product logic.
+
+Your goal is to make the existing product feel like a polished consumer wellness startup.
+
+DESIGN PRINCIPLES:
+- Premium
+- Calm
+- Modern
+- Intelligent
+- Human
+- Minimal
+- Highly usable
+- Mobile-first
+
+Improve:
+
+1. Typography hierarchy
+2. Spacing
+3. Card composition
+4. Navigation
+5. Button styling
+6. Form design
+7. Charts
+8. Empty states
+9. Loading states
+10. Error states
+11. Micro-interactions
+12. Page transitions
+13. Mobile layouts
+14. Desktop layouts
+
+HOME SHOULD FEEL SPECIAL.
+
+Create a strong visual hierarchy:
+Greeting
+↓
+Today's state
+↓
+Progress
+↓
+Future Me
+↓
+Personalized next action
+↓
+Feature shortcuts
+↓
+Recent insights
+
+Do not make every card the same size.
+
+Use visual storytelling.
+
+Examples:
+- Circular progress
+- Small trend lines
+- Timeline
+- Insight chips
+- Subtle gradients
+- Clear section labels
+
+Use restrained animations only where they improve understanding.
+
+Avoid:
+- excessive glassmorphism
+- excessive shadows
+- neon colors
+- childish illustrations
+- giant emoji usage
+- clutter
+- repetitive cards
+
+Make the app look excellent at:
+- 320px mobile
+- 375px mobile
+- 768px tablet
+- 1440px desktop
+
+Accessibility:
+- strong text contrast
+- keyboard navigation
+- visible focus states
+- readable font sizes
+- appropriate touch targets
+
+Then conduct a complete visual consistency review.
+
+Fix any inconsistent:
+- spacing
+- typography
+- icon sizing
+- border radius
+- component behavior
+- colors
+- empty states
+- responsive breakpoints
+
+Do not stop at superficial styling.
+Actually improve the composition of each screen.
+Perform a complete production-readiness audit of the entire Future Me application.
+
+Do not add new features.
+
+AUDIT:
+
+AUTH:
+- signup
+- login
+- logout
+- sessions
+- route protection
+
+PROFILE:
+- create
+- edit
+- persistence
+- validation
+
+STEPS:
+- create/update daily data
+- calculations
+- progress
+- history
+
+CALORIES:
+- target estimate
+- logging
+- history
+- validation
+
+FUTURE ME:
+- calculations
+- projections
+- insufficient-data states
+- no unsupported medical claims
+
+WELLNESS EXPERIMENTS:
+- create
+- start
+- daily check-in
+- completion
+- results
+
+SLEEP:
+- logging
+- history
+- recovery logic
+
+5-MINUTE VERSION OF ME:
+- energy selection
+- recommendation
+- completion
+- history
+
+WHY DO I FEEL LIKE THIS:
+- logging
+- pattern identification
+- insufficient-data handling
+
+PERIODS:
+- female-only access
+- cycle tracking
+- estimates
+- privacy
+
+HISTORY:
+- correct records
+- dates
+- filtering
+
+INSIGHTS:
+- 7-day
+- 30-day
+- correct calculations
+- charts
+
+GENERAL:
+- mobile responsiveness
+- accessibility
+- empty states
+- error states
+- loading states
+- database persistence
+- security
+- performance
+- console errors
+- broken routes
+- missing imports
+- unused code where practical
+
+Run the application and actively test the main user journeys using the browser.
+
+Fix every issue you discover.
+
+IMPORTANT:
+Do not tell me something is “working” without actually testing it.
+
+At the end, provide:
+1. What you tested
+2. What you fixed
+3. Any remaining limitations
+4. Any setup steps still required for deployment

@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: profile
     description: Authenticated wellness profile operations
+  - name: wellness
+    description: Authenticated personal wellness logs
 paths:
   /healthz:
     get:
@@ -61,6 +63,81 @@ paths:
           description: Invalid profile details
         "401":
           description: Authentication required
+  /wellness/entries:
+    get:
+      operationId: listWellnessEntries
+      tags: [wellness]
+      summary: List the signed-in user's wellness entries
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WellnessEntryKind"
+      responses:
+        "200":
+          description: Entries owned by the signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellnessEntriesResponse"
+        "401":
+          description: Authentication required
+    put:
+      operationId: upsertWellnessEntry
+      tags: [wellness]
+      summary: Create or update one of the signed-in user's wellness entries
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WellnessEntryInput"
+      responses:
+        "200":
+          description: Saved wellness entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellnessEntry"
+        "400":
+          description: Invalid entry
+        "401":
+          description: Authentication required
+        "403":
+          description: Entry not available for this profile
+  /wellness/entries/{entryKey}:
+    delete:
+      operationId: deleteWellnessEntry
+      tags: [wellness]
+      summary: Delete one of the signed-in user's wellness entries
+      parameters:
+        - name: entryKey
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 120
+      responses:
+        "204":
+          description: Entry deleted
+        "401":
+          description: Authentication required
+        "404":
+          description: Entry not found
 components:
   schemas:
     HealthStatus:
@@ -124,4 +201,223 @@ components:
             - $ref: "#/components/schemas/Profile"
             - type: "null"
       required: [completed, profile]
+    WellnessEntryKind:
+      type: string
+      enum:
+        - steps
+        - calories
+        - sleep
+        - energy
+        - feeling
+        - experiment
+        - experiment-checkin
+        - period
+    StepsWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          minimum: 0
+          maximum: 150000
+      required: [count]
+    CaloriesWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        count:
+          type: integer
+          minimum: 0
+          maximum: 20000
+      required: [count]
+    SleepWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        bedtime:
+          type: string
+          pattern: "^\\d{2}:\\d{2}$"
+        wakeTime:
+          type: string
+          pattern: "^\\d{2}:\\d{2}$"
+        durationMinutes:
+          type: integer
+          minimum: 0
+          maximum: 1440
+        quality:
+          type: integer
+          minimum: 1
+          maximum: 5
+        napMinutes:
+          type: integer
+          minimum: 0
+          maximum: 600
+        referenceTargetMinutes:
+          type: integer
+          minimum: 180
+          maximum: 720
+      required: [bedtime, wakeTime, durationMinutes, quality]
+    EnergyWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        level:
+          type: integer
+          enum: [10, 30, 50, 70, 90]
+        action:
+          type: string
+          minLength: 1
+          maxLength: 160
+        completed:
+          type: boolean
+      required: [level, action, completed]
+    FeelingWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        feeling:
+          type: string
+          enum: [tired, stressed, low mood, energetic, bloated, headache, poor focus, good, other]
+        intensity:
+          type: integer
+          minimum: 1
+          maximum: 10
+        note:
+          type: string
+          maxLength: 1000
+      required: [feeling, intensity]
+    ExperimentWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        goal:
+          type: string
+          minLength: 1
+          maxLength: 500
+        durationDays:
+          type: integer
+          minimum: 1
+          maximum: 90
+        metrics:
+          type: array
+          minItems: 1
+          maxItems: 8
+          items: { type: string, minLength: 1, maxLength: 80 }
+        notes:
+          type: string
+          maxLength: 1000
+        status:
+          type: string
+          enum: [active, paused, completed, cancelled]
+        startedAt:
+          type: string
+          format: date
+        endedAt:
+          type: string
+          format: date
+      required: [title, goal, durationDays, metrics, status, startedAt]
+    ExperimentCheckinWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        experimentKey:
+          type: string
+          minLength: 1
+          maxLength: 120
+        completed:
+          type: boolean
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        note:
+          type: string
+          maxLength: 1000
+      required: [experimentKey, completed, rating]
+    PeriodWellnessData:
+      type: object
+      additionalProperties: false
+      properties:
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        cycleLength:
+          type: integer
+          minimum: 15
+          maximum: 90
+        flow:
+          type: string
+          maxLength: 120
+        symptoms:
+          type: array
+          maxItems: 20
+          items: { type: string, maxLength: 80 }
+        mood:
+          type: string
+          maxLength: 80
+        notes:
+          type: string
+          maxLength: 1000
+      required: [startDate]
+    WellnessEntryInput:
+      type: object
+      additionalProperties: false
+      properties:
+        key:
+          type: string
+          minLength: 1
+          maxLength: 120
+        kind:
+          $ref: "#/components/schemas/WellnessEntryKind"
+        date:
+          type: string
+          format: date
+        data:
+          oneOf:
+            - $ref: "#/components/schemas/StepsWellnessData"
+            - $ref: "#/components/schemas/CaloriesWellnessData"
+            - $ref: "#/components/schemas/SleepWellnessData"
+            - $ref: "#/components/schemas/EnergyWellnessData"
+            - $ref: "#/components/schemas/FeelingWellnessData"
+            - $ref: "#/components/schemas/ExperimentWellnessData"
+            - $ref: "#/components/schemas/ExperimentCheckinWellnessData"
+            - $ref: "#/components/schemas/PeriodWellnessData"
+      required: [key, kind, date, data]
+    WellnessEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        key:
+          type: string
+        kind:
+          $ref: "#/components/schemas/WellnessEntryKind"
+        date:
+          type: string
+          format: date
+        data:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required: [id, key, kind, date, data, createdAt, updatedAt]
+    WellnessEntriesResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WellnessEntry"
+      required: [entries]
 

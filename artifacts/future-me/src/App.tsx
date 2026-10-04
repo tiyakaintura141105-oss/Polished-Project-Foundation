@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import {
   Activity, ArrowLeft, ArrowRight, ArrowUpRight, Check,
-  CircleHelp, Compass, Heart, History, Leaf, LogOut, Menu, Moon,
+  CircleHelp, Clock3, Compass, Heart, History, Leaf, LogOut, Menu, Moon,
   ShieldCheck, Sparkles, UserRound, Waves, X,
 } from 'lucide-react';
 import {
@@ -20,6 +20,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Form } from '@/components/ui/form';
+import { WellnessDashboard, WellnessPage, type WellnessPageId } from '@/components/wellness/WellnessPages';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -198,12 +199,18 @@ function ProtectedGate({ children }: { children: ReactNode }) {
 }
 
 const navItems = [
-  { href: '/dashboard', label: 'Today', icon: Compass },
-  { href: '/insights', label: 'Insights', icon: Sparkles },
-  { href: '/history', label: 'History', icon: History },
-  { href: '/profile', label: 'Your profile', icon: UserRound },
+  { href: '/dashboard', label: 'Today', icon: Compass, femaleOnly: false },
+  { href: '/future-me', label: 'Future Me', icon: Sparkles, femaleOnly: false },
+  { href: '/experiments', label: 'Experiments', icon: Activity, femaleOnly: false },
+  { href: '/sleep', label: 'Sleep', icon: Moon, femaleOnly: false },
+  { href: '/five-minute', label: 'Five minutes', icon: Clock3, femaleOnly: false },
+  { href: '/feelings', label: 'Feelings', icon: Heart, femaleOnly: false },
+  { href: '/periods', label: 'Periods', icon: Waves, femaleOnly: true },
+  { href: '/insights', label: 'Insights', icon: Sparkles, femaleOnly: false },
+  { href: '/history', label: 'History', icon: History, femaleOnly: false },
+  { href: '/profile', label: 'Your profile', icon: UserRound, femaleOnly: false },
 ];
-function AppFrame({ children, active }: { children: ReactNode; active: string }) {
+function AppFrame({ children, active, showPeriods = false }: { children: ReactNode; active: string; showPeriods?: boolean }) {
   const { signOut } = useClerk();
   const [menuOpen, setMenuOpen] = useState(false);
   return <div className="app-shell">
@@ -211,7 +218,7 @@ function AppFrame({ children, active }: { children: ReactNode; active: string })
       <div className="sidebar-top"><Brand /><button className="mobile-close" onClick={() => setMenuOpen(false)} aria-label="Close menu" data-testid="button-close-menu"><X size={18} /></button></div>
       <div className="side-caption">YOUR SPACE</div>
       <nav className="side-nav" aria-label="Main navigation">
-        {navItems.map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`side-link ${active === href ? 'side-link-active' : ''}`} data-testid={`link-nav-${href.slice(1)}`}>
+        {navItems.filter((item) => !item.femaleOnly || showPeriods).map(({ href, label, icon: Icon }) => <Link key={href} href={href} onClick={() => setMenuOpen(false)} className={`side-link ${active === href ? 'side-link-active' : ''}`} data-testid={`link-nav-${href.slice(1)}`}>
           <Icon size={18} strokeWidth={1.8} /><span>{label}</span>{active === href && <span className="side-indicator" />}
         </Link>)}
       </nav>
@@ -239,53 +246,22 @@ function Dashboard() {
   if (profileQuery.isError) return <AppFrame active="/dashboard"><QueryError retry={() => profileQuery.refetch()} /></AppFrame>;
   const profile = profileQuery.data?.profile;
   if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
-  return <AppFrame active="/dashboard">
-    <div className="dashboard-head">
-      <div><span className="section-kicker">YOUR DAILY SPACE <span className="kicker-line" /></span><h1 className="display greeting">Good to see you,<br /><em>{profile.name.split(' ')[0]}.</em></h1><p className="page-intro">A place to check in with yourself and make room for what matters today.</p></div>
-      <div className="date-chip"><span className="date-day">{new Intl.DateTimeFormat('en', { day: '2-digit' }).format(new Date())}</span><span>{new Intl.DateTimeFormat('en', { weekday: 'short', month: 'short' }).format(new Date())}</span></div>
-    </div>
-    <div className="dashboard-grid">
-      <section className="today-card">
-        <div className="today-card-top"><span className="card-overline">A MOMENT FOR YOU</span><span className="today-icon"><Waves size={19} /></span></div>
-        <div className="today-empty"><div className="empty-rings"><span /><span /><span /><i><Moon size={23} /></i></div><h2 className="display">Your day, as it unfolds.</h2><p>Daily habit tracking is on its way. For now, this space is here for your next small, thoughtful step.</p><div className="coming-tag"><span /> DAILY CHECK-INS <b>IN DEVELOPMENT</b></div></div>
-      </section>
-      <section className="reflection-card">
-        <div className="reflection-top"><span className="card-overline">A THOUGHT TO KEEP</span><Sparkles size={18} /></div>
-        <div className="reflection-content"><span className="reflection-number">01</span><h2 className="display">Wellbeing is not a finish line.</h2><p>There’s value in noticing where you are, before deciding where to go.</p></div>
-        <span className="reflection-foot">A GENTLE REMINDER, FOR TODAY</span>
-      </section>
-    </div>
-    <section className="perspective-section"><div className="perspective-heading"><div><span className="section-kicker">YOUR PERSPECTIVE</span><h2 className="display">A little context goes a long way.</h2></div><Link href="/profile" className="subtle-link" data-testid="link-edit-profile">View profile <ArrowUpRight size={15} /></Link></div>
-      <div className="context-strip"><div><span className="context-label">YOUR FOCUS</span><strong>{goalLabel[profile.goal]}</strong></div><div><span className="context-label">YOUR RHYTHM</span><strong>{activityLabel[profile.activityLevel]}</strong></div><div><span className="context-label">YOUR STARTING POINT</span><strong>{profile.heightCm} cm <i>·</i> {profile.weightKg} kg</strong></div></div>
-    </section>
-    <section className="preview-row">
-      <FeaturePreview icon={<Sparkles size={18} />} eyebrow="PATTERNS, WITH CONTEXT" title="Insights that grow with you" copy="As your daily reflections take shape, you’ll have a clearer view of the rhythms that feel like yours." tag="INSIGHTS" />
-      {profile.sex === 'female' && <FeaturePreview icon={<Waves size={18} />} eyebrow="A CYCLE-AWARE PERSPECTIVE" title="Your body, in its own rhythm" copy="A future space for cycle-aware reflections, designed to stay personal and entirely yours." tag="PERIODS" />}
-    </section>
-    <footer className="app-footer"><span>Future Me is a personal wellbeing companion, not medical advice.</span><span>Made for the person you’re becoming.</span></footer>
+  return <AppFrame active="/dashboard" showPeriods={profile.sex === 'female'}>
+    <WellnessDashboard profile={profile} />
   </AppFrame>;
 }
 
-const goalLabel: Record<ProfileInput['goal'], string> = { 'lose-weight': 'Feel lighter', 'maintain-weight': 'Maintain balance', 'gain-weight': 'Build strength', 'improve-wellness': 'Feel well, overall' };
-const activityLabel: Record<ProfileInput['activityLevel'], string> = { sedentary: 'Mostly at rest', 'lightly-active': 'A little movement', 'moderately-active': 'Steady movement', 'very-active': 'Lots of movement' };
-function FeaturePreview({ icon, eyebrow, title, copy, tag }: { icon: ReactNode; eyebrow: string; title: string; copy: string; tag: string }) {
-  return <div className="feature-preview"><div className="preview-icon">{icon}</div><div className="preview-tag">{tag} <span>COMING LATER</span></div><span className="preview-kicker">{eyebrow}</span><h3 className="display">{title}</h3><p>{copy}</p></div>;
-}
-
-function EmptyWorkspace({ active, eyebrow, title, description, icon }: { active: string; eyebrow: string; title: string; description: string; icon: ReactNode }) {
-  return <AppFrame active={active}><div className="page-heading"><span className="section-kicker">{eyebrow}</span><h1 className="display">{title}</h1><p>{description}</p></div><div className="empty-workspace">
-    <div className="empty-workspace-art"><div className="empty-art-ring ring-a" /><div className="empty-art-ring ring-b" /><span>{icon}</span></div>
-    <span className="coming-tag"><span /> A SPACE IN THE MAKING <b>IN DEVELOPMENT</b></span>
-    <h2 className="display">Nothing to look back on, just yet.</h2>
-    <p>Once daily reflections are available, this is where you’ll find {active === '/history' ? 'your moments over time' : 'patterns shaped by your own experience'}. No assumptions. Just your own story, when you’re ready.</p>
-    <Link href="/dashboard" className="subtle-link" data-testid="link-back-today">Back to today <ArrowRight size={15} /></Link>
-  </div></AppFrame>;
-}
-function Insights() {
-  return <EmptyWorkspace active="/insights" eyebrow="A WIDER VIEW" title="Insights" description="Gentle perspective on the patterns that make up your days." icon={<Sparkles size={23} />} />;
-}
-function HistoryPage() {
-  return <EmptyWorkspace active="/history" eyebrow="YOUR OWN STORY" title="History" description="A quiet record of how your days have felt and changed." icon={<History size={23} />} />;
+function WellnessRoute({ pageId }: { pageId: WellnessPageId }) {
+  const profileQuery = useGetMyProfile({ query: { queryKey: getGetMyProfileQueryKey() } });
+  const active = `/${pageId}`;
+  if (profileQuery.isLoading) return <AppFrame active={active}><LoadingScreen label="Opening your personal space" /></AppFrame>;
+  if (profileQuery.isError) return <AppFrame active={active}><QueryError retry={() => profileQuery.refetch()} /></AppFrame>;
+  const profile = profileQuery.data?.profile;
+  if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
+  if (pageId === 'periods' && profile.sex !== 'female') return <Redirect to="/dashboard" />;
+  return <AppFrame active={active} showPeriods={profile.sex === 'female'}>
+    <WellnessPage pageId={pageId} profile={profile} />
+  </AppFrame>;
 }
 
 const steps = [
@@ -327,7 +303,7 @@ function ProfileSetup({ mode = 'onboarding', initial }: { mode?: 'onboarding' | 
     if (valid) setStep((current) => Math.min(3, current + 1));
   };
   const values = form.watch();
-  return <AppFrame active={isEditing ? '/profile' : ''}>
+  return <AppFrame active={isEditing ? '/profile' : ''} showPeriods={initial?.sex === 'female'}>
     <div className={`setup-layout ${isEditing ? 'profile-edit-layout' : ''}`}>
       <div className="setup-main">
         <div className="setup-topline"><span className="section-kicker">{isEditing ? 'YOUR DETAILS' : 'YOUR PERSONAL STARTING POINT'}</span><span className="setup-count">{isEditing ? 'PROFILE' : `STEP ${String(step + 1).padStart(2, '0')} / 04`}</span></div>
@@ -419,8 +395,14 @@ function Router() {
     <Route path="/sign-up/*?" component={SignUpPage} />
     <Route path="/onboarding">{() => <ProtectedGate><Onboarding /></ProtectedGate>}</Route>
     <Route path="/dashboard">{() => <ProtectedGate><Dashboard /></ProtectedGate>}</Route>
-    <Route path="/insights">{() => <ProtectedGate><Insights /></ProtectedGate>}</Route>
-    <Route path="/history">{() => <ProtectedGate><HistoryPage /></ProtectedGate>}</Route>
+    <Route path="/future-me">{() => <ProtectedGate><WellnessRoute pageId="future-me" /></ProtectedGate>}</Route>
+    <Route path="/experiments">{() => <ProtectedGate><WellnessRoute pageId="experiments" /></ProtectedGate>}</Route>
+    <Route path="/sleep">{() => <ProtectedGate><WellnessRoute pageId="sleep" /></ProtectedGate>}</Route>
+    <Route path="/five-minute">{() => <ProtectedGate><WellnessRoute pageId="five-minute" /></ProtectedGate>}</Route>
+    <Route path="/feelings">{() => <ProtectedGate><WellnessRoute pageId="feelings" /></ProtectedGate>}</Route>
+    <Route path="/periods">{() => <ProtectedGate><WellnessRoute pageId="periods" /></ProtectedGate>}</Route>
+    <Route path="/insights">{() => <ProtectedGate><WellnessRoute pageId="insights" /></ProtectedGate>}</Route>
+    <Route path="/history">{() => <ProtectedGate><WellnessRoute pageId="history" /></ProtectedGate>}</Route>
     <Route path="/profile">{() => <ProtectedGate><ProfilePage /></ProtectedGate>}</Route>
     <Route component={NotFound} />
   </Switch></RoutedErrorBoundary>;

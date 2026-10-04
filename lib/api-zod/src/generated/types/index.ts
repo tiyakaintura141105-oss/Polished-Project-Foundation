@@ -6,10 +6,27 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './caloriesWellnessData';
+export * from './energyWellnessData';
+export * from './energyWellnessDataLevel';
+export * from './experimentCheckinWellnessData';
+export * from './experimentWellnessData';
+export * from './experimentWellnessDataStatus';
+export * from './feelingWellnessData';
+export * from './feelingWellnessDataFeeling';
 export * from './healthStatus';
+export * from './listWellnessEntriesParams';
 export * from './myProfileResponse';
+export * from './periodWellnessData';
 export * from './profile';
 export * from './profileInput';
 export * from './profileInputActivityLevel';
 export * from './profileInputGoal';
 export * from './profileInputSex';
+export * from './sleepWellnessData';
+export * from './stepsWellnessData';
+export * from './wellnessEntriesResponse';
+export * from './wellnessEntry';
+export * from './wellnessEntryData';
+export * from './wellnessEntryInput';
+export * from './wellnessEntryKind';
