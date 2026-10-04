@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Future Me"
+description = "A personalized wellness app for tracking daily habits, building consistency, and reflecting on recent patterns without making medical diagnoses."
+version = "1.0.0"
+id = "artifacts/future-me"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20370
+
+[services.development]
+run = "pnpm --filter @workspace/future-me run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/future-me", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/future-me/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20370"
+BASE_PATH = "/"

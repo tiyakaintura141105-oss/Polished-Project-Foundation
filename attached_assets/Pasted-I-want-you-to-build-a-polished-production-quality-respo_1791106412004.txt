@@ -1,0 +1,276 @@
+I want you to build a polished, production-quality responsive web application called “Future Me”.
+
+IMPORTANT:
+Do not create a generic health tracker. This should feel like a modern consumer wellness product with a premium, intelligent and highly polished UX.
+
+PRODUCT CONCEPT:
+Future Me is a personalized wellness app that helps users track their daily wellness habits and understand how their current behavior may shape their near-future wellness. The app should focus on patterns, consistency, self-awareness and actionable recommendations rather than diagnosis.
+
+PRIMARY USER FLOW:
+
+LOGIN
+↓
+PROFILE SETUP
+↓
+HOME DASHBOARD
+↓
+FEATURES
+- Steps
+- Calories
+- Personal Wellness Experiments
+- Sleep Debt Recovery
+- 5-Minute Version of Me / Energy-Adaptive Wellness
+- Why Do I Feel Like This?
+- Periods for female users only
+↓
+HISTORY
+↓
+7-DAY / 30-DAY INSIGHTS
+
+TECHNICAL GOAL:
+Build a real full-stack application, not a static mockup.
+
+Use:
+- React
+- TypeScript
+- Vite
+- Tailwind CSS
+- A clean component-based architecture
+- A real persistent database
+- Secure authentication
+- Responsive mobile-first design
+
+For authentication and persistence, prefer Replit's built-in authentication/database capabilities if they are appropriate and available in this environment. If an external service is required, use Supabase and structure the application cleanly around environment variables. Do not hard-code secrets.
+
+GENERAL ENGINEERING REQUIREMENTS:
+- TypeScript throughout
+- Reusable components
+- Clean folder structure
+- Strong form validation
+- Loading states
+- Empty states
+- Error states
+- Success states
+- Responsive layout
+- Accessible buttons, forms and navigation
+- No fake buttons
+- No dead-end screens
+- No placeholder lorem ipsum
+- No unfinished sections
+- No console errors
+- Do not hard-code user-specific data
+- Keep business logic separate from UI where practical
+- Use sensible naming conventions
+- Avoid unnecessary dependencies
+
+DESIGN DIRECTION:
+Create a modern wellness aesthetic.
+
+Visual personality:
+- Calm
+- Premium
+- Intelligent
+- Friendly
+- Minimal
+- Slightly futuristic
+- Not clinical
+- Not childish
+
+Use:
+- Soft neutral backgrounds
+- Elegant typography
+- Rounded cards
+- Subtle borders
+- Tasteful gradients
+- Clear visual hierarchy
+- Plenty of whitespace
+- Smooth but restrained animations
+- Excellent mobile UX
+
+The design should feel like a real startup product that could be shown to investors or a wellness company.
+
+NAVIGATION:
+Create a persistent mobile-friendly navigation system.
+
+Suggested primary navigation:
+- Home
+- Insights
+- History
+- Profile
+
+Feature pages can open from the Home dashboard.
+
+HOME DASHBOARD:
+Do not make the dashboard a boring grid of identical cards.
+
+Create visual hierarchy:
+1. Personalized greeting
+2. Today's wellness snapshot
+3. Progress toward today's activity goal
+4. Future Me preview
+5. Feature cards
+6. Recent activity / insights
+
+PERSONALIZATION:
+The profile should eventually capture:
+- Name
+- Age
+- Sex
+- Height
+- Weight
+- Goal
+- Activity level
+- Optional wellness preferences
+
+Goal options:
+- Lose weight
+- Maintain weight
+- Gain weight
+- Improve overall wellness
+
+Sex:
+- Male
+- Female
+
+Important:
+The app should treat “sex” as a profile setting for the requested experience and should not make unsupported medical assumptions from it.
+
+FEMALE USERS:
+Female profiles should have a Periods feature.
+Male profiles should not see the Periods feature in navigation or dashboard.
+
+HEALTH SAFETY:
+This is a wellness product, not a diagnostic or medical device.
+
+Do NOT:
+- Diagnose diseases
+- Claim to predict illness
+- Promise exact weight loss
+- Make medical guarantees
+- Present generated insights as medical facts
+
+Use language such as:
+- “may”
+- “could”
+- “your recent pattern suggests”
+- “based on the data you logged”
+
+For calorie and activity recommendations, clearly label them as estimates and encourage users to seek professional advice for medical or specific nutritional needs.
+
+FIRST TASK:
+Before implementing every feature, first create the complete project architecture and foundational UI shell.
+
+Create:
+- Application layout
+- Routing
+- Authentication screens placeholder structure
+- Main navigation
+- Dashboard shell
+- Profile page shell
+- History page shell
+- Insights page shell
+- Reusable UI components
+- Theme/design tokens
+- Database integration structure
+- Validation structure
+- Error handling structure
+
+Do NOT fully implement all feature logic yet.
+
+After completing the foundation:
+1. Run the app.
+2. Test all routes.
+3. Fix any errors.
+4. Check responsive behavior.
+5. Tell me exactly what you created and what remains to be implemented.
+
+Do not move to the next feature until the foundation works properly.
+heres prompt 2:
+Now implement the complete authentication and onboarding experience.
+
+AUTHENTICATION:
+Create:
+- Sign up
+- Log in
+- Log out
+- Session persistence
+- Protected application routes
+- Proper validation
+- Friendly authentication error messages
+
+Login screen:
+- Beautiful branded Future Me interface
+- Email
+- Password
+- Show/hide password
+- Remember/session behavior where supported
+- Forgot password flow if supported by the authentication system
+- Clear transition to sign-up
+
+Sign-up screen:
+- Name
+- Email
+- Password
+- Confirm password
+- Strong validation
+- Clear success/error feedback
+
+PROFILE ONBOARDING:
+After first signup, guide the user through a clean multi-step profile setup.
+
+Collect:
+1. Name
+2. Age
+3. Sex: Male / Female
+4. Height
+5. Weight
+6. Goal:
+   - Lose weight
+   - Maintain weight
+   - Gain weight
+   - Improve overall wellness
+7. Activity level:
+   - Sedentary
+   - Lightly active
+   - Moderately active
+   - Very active
+
+Make onboarding feel like a premium wellness experience, not a boring form.
+
+Use progress indicators such as:
+Step 1 of 4
+Step 2 of 4
+etc.
+
+Allow:
+- Back
+- Continue
+- Save
+- Edit later
+
+VALIDATION:
+Prevent invalid values such as:
+- Negative weight
+- Impossible height
+- Age outside a reasonable user-entered range
+- Empty required fields
+
+After onboarding:
+- Save profile data persistently
+- Redirect to Home
+- Personalize greeting and dashboard
+
+IMPORTANT:
+Do not expose sensitive information unnecessarily.
+Never place passwords in application state or database tables manually.
+Use the authentication provider correctly.
+
+Then test:
+- new user signup
+- login
+- logout
+- protected route access
+- profile persistence
+- returning-user login
+
+Fix all issues before finishing.

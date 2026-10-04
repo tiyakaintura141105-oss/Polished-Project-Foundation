@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: profile
+    description: Authenticated wellness profile operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /profiles/me:
+    get:
+      operationId: getMyProfile
+      tags: [profile]
+      summary: Get the signed-in user's wellness profile
+      responses:
+        "200":
+          description: Profile completion state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MyProfileResponse"
+        "401":
+          description: Authentication required
+    put:
+      operationId: saveMyProfile
+      tags: [profile]
+      summary: Create or update the signed-in user's wellness profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProfileInput"
+      responses:
+        "200":
+          description: Saved wellness profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Profile"
+        "400":
+          description: Invalid profile details
+        "401":
+          description: Authentication required
 components:
   schemas:
     HealthStatus:
@@ -33,4 +70,58 @@ components:
           type: string
       required:
         - status
+    ProfileInput:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        age:
+          type: integer
+          minimum: 13
+          maximum: 120
+        sex:
+          type: string
+          enum: [male, female]
+        heightCm:
+          type: number
+          minimum: 90
+          maximum: 250
+        weightKg:
+          type: number
+          minimum: 25
+          maximum: 350
+        goal:
+          type: string
+          enum: [lose-weight, maintain-weight, gain-weight, improve-wellness]
+        activityLevel:
+          type: string
+          enum: [sedentary, lightly-active, moderately-active, very-active]
+      required: [name, age, sex, heightCm, weightKg, goal, activityLevel]
+    Profile:
+      allOf:
+        - $ref: "#/components/schemas/ProfileInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+          required: [id, createdAt, updatedAt]
+    MyProfileResponse:
+      type: object
+      properties:
+        completed:
+          type: boolean
+        profile:
+          oneOf:
+            - $ref: "#/components/schemas/Profile"
+            - type: "null"
+      required: [completed, profile]
 
