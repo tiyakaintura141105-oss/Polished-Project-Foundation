@@ -183,6 +183,7 @@ function DashboardPage({ profile, entries, save, isSaving }: ReturnType<typeof u
   const [stepError, setStepError] = useState('');
   const [calorieError, setCalorieError] = useState('');
   const recent = withinDays(entries, 7);
+  const loggedDays = new Set(recent.map((entry) => entry.date)).size;
   const weekSteps = dailySeries(entries, 'steps', 7);
   const future = futureMeProjection(entries, today, 7);
   const latestFeeling = sortNewest(entries.filter((entry) => entry.kind === 'feeling'))[0];
@@ -876,9 +877,13 @@ function ExperimentCard({ entry, data, checkins, averageRating, isSaving, checki
   const completionRate = duringCheckins.length ? Math.round((triedCount / duringCheckins.length) * 100) : null;
   const validRatings = duringCheckins
     .map((item) => ({ entry: item, data: readData<CheckinData>(item) }))
-    .filter(({ data: check }) =>
-      Number.isInteger(check?.rating) && Number(check?.rating) >= 1 && Number(check?.rating) <= 5,
-    );
+    .filter((item): item is { entry: WellnessEntry; data: CheckinData } => {
+      const rating = item.data?.rating;
+      return typeof rating === 'number' &&
+        Number.isInteger(rating) &&
+        rating >= 1 &&
+        rating <= 5;
+    });
   const beforeAndDuring = data.baselineRating && averageRating
     ? `Your starting rating was ${data.baselineRating}/5; your mean during rating is ${averageRating}/5. That difference is an association in your notes, not evidence that the experiment caused a change.`
     : data.baselineRating ? `Starting rating: ${data.baselineRating}/5. Add check-ins for a during average; any comparison will remain an association, not cause.` :

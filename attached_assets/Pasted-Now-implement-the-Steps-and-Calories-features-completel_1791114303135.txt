@@ -1,0 +1,260 @@
+Now implement the Steps and Calories features completely.
+
+STEP TRACKER:
+
+Create a dedicated Steps section on the Home dashboard.
+
+Display:
+- Today's steps
+- Today's personalized target
+- Steps remaining
+- Percentage completed
+- Visual progress indicator
+- Weekly step trend
+- Recent daily totals
+
+Allow the user to manually enter/update today's step count.
+
+PERSONALIZED STEP GOAL:
+Create a transparent estimation system using available profile information such as:
+- age
+- height
+- weight
+- sex
+- goal
+- activity level
+
+Do not claim the calculation is medically optimal.
+Present it as a personalized wellness target/estimate.
+
+The goal must be clearly displayed.
+
+Example:
+6,240 / 8,000 steps
+1,760 steps remaining
+
+Add motivational messaging that changes based on progress:
+- Just getting started
+- Good progress
+- Almost there
+- Goal completed
+
+CALORIE TRACKER:
+
+Create:
+- Daily calorie target estimate
+- Calories logged today
+- Remaining calories
+- Daily progress
+- 7-day history
+- 30-day history
+
+Allow users to manually enter calorie intake for the day.
+
+PROFILE-BASED ESTIMATE:
+Use age, sex, height, weight, activity level and goal to create an estimated calorie target.
+
+Clearly label it:
+“Estimated daily calorie target”
+
+Do NOT:
+- Claim exact calorie requirements
+- Guarantee weight loss/gain
+- Give medical nutrition advice
+
+Allow users to edit their profile later and recalculate estimates.
+
+UI:
+Steps and Calories should look visually different but belong to the same design system.
+
+Make the experience highly intuitive and mobile-friendly.
+
+Persist all entries in the database.
+
+Add:
+- loading state
+- empty state
+- validation
+- save confirmation
+- error handling
+
+Run tests and fix all errors.
+Now implement the core differentiating feature: “Future Me”.
+
+IMPORTANT:
+Future Me is NOT a medical prediction engine.
+
+Its purpose is to help users understand what their current habits may look like if maintained over time.
+
+Create a dedicated Future Me section on the Home dashboard and a detailed Future Me page.
+
+INPUT DATA:
+Use available user data such as:
+- steps
+- calorie logging consistency
+- sleep data
+- wellness experiment results
+- energy levels
+- symptoms/feelings logs
+- period data when available
+
+The system should analyze recent logged behavior and generate transparent habit projections.
+
+EXAMPLE:
+If a user averages 6,200 steps/day over the last 7 days:
+
+“Your current average is 6,200 steps/day.
+If this continues for the next 30 days, you would accumulate approximately 186,000 steps.”
+
+Do similar projections for:
+- consistency
+- activity
+- logging behavior
+- sleep consistency where data exists
+
+IMPORTANT:
+Do not predict:
+- exact future weight
+- disease
+- medical conditions
+- guaranteed physical outcomes
+
+Instead show:
+- projected activity
+- projected consistency
+- likely habit continuation
+- areas that may need attention
+
+Create a visual “Future Me” timeline:
+
+TODAY
+↓
+7 DAYS
+↓
+30 DAYS
+
+Example:
+TODAY
+6,200 avg steps
+
+7 DAYS
+43,400 projected steps
+
+30 DAYS
+186,000 projected steps
+
+Add a section:
+“What is shaping your Future Me?”
+
+Show the user's strongest recent patterns.
+
+Example:
+- Activity: improving
+- Sleep consistency: needs attention
+- Nutrition logging: strong
+- Wellness experiment consistency: moderate
+
+Create:
+1. Positive pattern
+2. Biggest opportunity
+3. One small action for tomorrow
+
+The interface should feel exciting and personalized.
+
+Use tasteful animations:
+- number count-up
+- timeline reveal
+- progress animation
+
+Do not overdo animation.
+
+Make calculations deterministic and explainable.
+Do not invent data.
+
+If there isn't enough data:
+show:
+“Your Future Me becomes smarter as you log more.”
+
+Then recommend the next useful action.
+
+Persist and retrieve all relevant user data.
+Test extensively with:
+- zero data
+- one day of data
+- seven days of data
+- incomplete data
+- unusual values
+
+Fix all issues.
+Now build “Personal Wellness Experiments”.
+
+Concept:
+Users can test small lifestyle changes on themselves for a defined period and compare their experience before and during the experiment.
+
+Examples:
+- Stop caffeine after 2 PM
+- 20-minute walk every day
+- Drink more water
+- Sleep at a consistent time
+- 5-minute evening wind-down
+
+IMPORTANT:
+These are wellness experiments, not medical experiments.
+
+FEATURES:
+
+Experiment creation:
+- Choose experiment template OR create custom experiment
+- Experiment name
+- Goal
+- Duration
+- Daily check-in metric
+- Optional notes
+
+Example:
+“Stop caffeine after 2 PM”
+Duration: 7 days
+Track:
+- sleep quality
+- energy
+- mood
+
+Daily check-in:
+- completed / not completed
+- simple rating
+- optional note
+
+Experiment dashboard:
+- Current experiment
+- Day X of Y
+- Completion rate
+- Trend chart
+- Notes
+
+Experiment completion:
+Compare:
+- Before experiment
+- During experiment
+
+Show observations carefully:
+“Your average sleep rating was higher during the experiment.”
+
+Do not say:
+“This proves caffeine caused better sleep.”
+
+Use language such as:
+“Your logged data shows an association.”
+
+Create a beautiful experiment card and progress experience.
+
+Allow:
+- start
+- pause
+- complete
+- cancel
+
+Persist everything.
+
+Add empty states and validation.
+
+Test all flows.

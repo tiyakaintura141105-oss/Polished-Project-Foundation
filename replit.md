@@ -1,15 +1,17 @@
-# [Project name]
+# Future Me
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A personal wellness app for recording daily habits and reflecting on transparent, behavior-based projections without making medical predictions.
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/future-me run dev` — run the web app
+- `pnpm --filter @workspace/api-server run dev` — run the API server
 - `pnpm run typecheck` — full typecheck across all packages
+- `pnpm --filter @workspace/future-me run test` — run the wellness calculation tests
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/db run push` — apply schema changes to the development database
+- Replit artifact workflows provide the web/API ports, routing, and `DATABASE_URL`. Clerk authentication keys are provisioned through Replit-managed Clerk; do not add them manually.
 
 ## Stack
 
