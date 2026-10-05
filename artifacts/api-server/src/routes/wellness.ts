@@ -1,5 +1,5 @@
 import { getAuth } from "@clerk/express";
-import { and, asc, eq, gte, lte } from "drizzle-orm";
+import { and, asc, eq, gte, lte, ne } from "drizzle-orm";
 import { Router, type IRouter } from "express";
 import {
   db,
@@ -130,7 +130,7 @@ function dataMatchesKind(kind: EntryKind, value: unknown): value is Record<strin
     case "period":
       return validCalendarDate(value.startDate) &&
         (value.endDate === undefined || validCalendarDate(value.endDate)) &&
-        (value.cycleLength === undefined || boundedInteger(value.cycleLength, 15, 90)) &&
+        (value.cycleLength === undefined || boundedInteger(value.cycleLength, 1, 365)) &&
         (value.flow === undefined || boundedString(value.flow, 0, 120)) &&
         (value.symptoms === undefined || (Array.isArray(value.symptoms) &&
           value.symptoms.length <= 20 && value.symptoms.every((symptom) => boundedString(symptom, 0, 80)))) &&
@@ -253,6 +253,24 @@ router.put("/wellness/entries", requireAuth, async (req, res): Promise<void> => 
       res.status(403).json({ error: "This entry is not available for this profile." });
       return;
     }
+    if (entryData.startDate !== date) {
+      res.status(400).json({ error: "The entry date must match the cycle start date." });
+      return;
+    }
+    const [duplicateStart] = await db
+      .select({ entryKey: wellnessEntriesTable.entryKey })
+      .from(wellnessEntriesTable)
+      .where(and(
+        eq(wellnessEntriesTable.clerkUserId, userId),
+        eq(wellnessEntriesTable.kind, "period"),
+        eq(wellnessEntriesTable.entryDate, date),
+        ne(wellnessEntriesTable.entryKey, parsed.data.key),
+      ))
+      .limit(1);
+    if (duplicateStart) {
+      res.status(409).json({ error: "A cycle note already exists for that start date." });
+      return;
+    }
   }
 
   if (parsed.data.kind === "experiment-checkin") {
@@ -331,7 +349,8 @@ router.delete("/wellness/entries/:entryKey", requireAuth, async (req, res): Prom
     return;
   }
   const [entry] = await db
-    .delete(wellnessEntriesTable)
+    .select({ kind: wellnessEntriesTable.kind })
+    .from(wellnessEntriesTable)
     .where(and(
       eq(wellnessEntriesTable.clerkUserId, userId),
       eq(wellnessEntriesTable.entryKey, params.data.entryKey),
@@ -341,6 +360,23 @@ router.delete("/wellness/entries/:entryKey", requireAuth, async (req, res): Prom
     res.status(404).json({ error: "Entry not found." });
     return;
   }
+  if (entry.kind === "period") {
+    const [profile] = await db
+      .select({ sex: profilesTable.sex })
+      .from(profilesTable)
+      .where(eq(profilesTable.clerkUserId, userId))
+      .limit(1);
+    if (profile?.sex !== "female") {
+      res.status(403).json({ error: "This entry is not available for this profile." });
+      return;
+    }
+  }
+  await db
+    .delete(wellnessEntriesTable)
+    .where(and(
+      eq(wellnessEntriesTable.clerkUserId, userId),
+      eq(wellnessEntriesTable.entryKey, params.data.entryKey),
+    ));
   res.sendStatus(204);
 });
 

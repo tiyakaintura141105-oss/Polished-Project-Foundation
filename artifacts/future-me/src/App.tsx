@@ -21,6 +21,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Form } from '@/components/ui/form';
 import { WellnessDashboard, WellnessPage, type WellnessPageId } from '@/components/wellness/WellnessPages';
+import { canAccessCycleTracking } from '@/lib/wellness-metrics';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -246,7 +247,7 @@ function Dashboard() {
   if (profileQuery.isError) return <AppFrame active="/dashboard"><QueryError retry={() => profileQuery.refetch()} /></AppFrame>;
   const profile = profileQuery.data?.profile;
   if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
-  return <AppFrame active="/dashboard" showPeriods={profile.sex === 'female'}>
+  return <AppFrame active="/dashboard" showPeriods={canAccessCycleTracking(profile.sex)}>
     <WellnessDashboard profile={profile} />
   </AppFrame>;
 }
@@ -258,8 +259,8 @@ function WellnessRoute({ pageId }: { pageId: WellnessPageId }) {
   if (profileQuery.isError) return <AppFrame active={active}><QueryError retry={() => profileQuery.refetch()} /></AppFrame>;
   const profile = profileQuery.data?.profile;
   if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
-  if (pageId === 'periods' && profile.sex !== 'female') return <Redirect to="/dashboard" />;
-  return <AppFrame active={active} showPeriods={profile.sex === 'female'}>
+  if (pageId === 'periods' && !canAccessCycleTracking(profile.sex)) return <Redirect to="/dashboard" />;
+  return <AppFrame active={active} showPeriods={canAccessCycleTracking(profile.sex)}>
     <WellnessPage pageId={pageId} profile={profile} />
   </AppFrame>;
 }
@@ -303,7 +304,7 @@ function ProfileSetup({ mode = 'onboarding', initial }: { mode?: 'onboarding' | 
     if (valid) setStep((current) => Math.min(3, current + 1));
   };
   const values = form.watch();
-  return <AppFrame active={isEditing ? '/profile' : ''} showPeriods={initial?.sex === 'female'}>
+  return <AppFrame active={isEditing ? '/profile' : ''} showPeriods={initial ? canAccessCycleTracking(initial.sex) : false}>
     <div className={`setup-layout ${isEditing ? 'profile-edit-layout' : ''}`}>
       <div className="setup-main">
         <div className="setup-topline"><span className="section-kicker">{isEditing ? 'YOUR DETAILS' : 'YOUR PERSONAL STARTING POINT'}</span><span className="setup-count">{isEditing ? 'PROFILE' : `STEP ${String(step + 1).padStart(2, '0')} / 04`}</span></div>

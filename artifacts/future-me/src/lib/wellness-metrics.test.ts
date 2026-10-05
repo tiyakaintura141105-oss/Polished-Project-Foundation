@@ -5,6 +5,8 @@ import {
   addCalendarDays,
   calculateCalorieTarget,
   calculateStepGoal,
+  canAccessCycleTracking,
+  cycleEntryKey,
   cycleSummary,
   dailySeries,
   energyAction,
@@ -16,6 +18,7 @@ import {
   loggingConsistency,
   sleepSummary,
   stepProgress,
+  visibleEntriesForProfile,
 } from "./wellness-metrics";
 
 const profile = (overrides: Partial<Profile> = {}): Profile => ({
@@ -48,6 +51,21 @@ function entry(
     updatedAt: `${date}T12:00:00.000Z`,
   };
 }
+
+test("period access is female-profile only and male-facing data omits cycle entries", () => {
+  const cycle = entry("period", "2026-10-04", { startDate: "2026-10-04" }, 1);
+  const steps = entry("steps", "2026-10-04", { count: 1_000 }, 2);
+
+  assert.equal(canAccessCycleTracking("female"), true);
+  assert.equal(canAccessCycleTracking("male"), false);
+  assert.deepEqual(visibleEntriesForProfile([cycle, steps], "female"), [cycle, steps]);
+  assert.deepEqual(visibleEntriesForProfile([cycle, steps], "male"), [steps]);
+});
+
+test("editing an older cycle note keeps its key when the saved start date changes", () => {
+  assert.equal(cycleEntryKey("2026-10-04"), "period-2026-10-04");
+  assert.equal(cycleEntryKey("2026-10-05", "period-2026-09-01"), "period-2026-09-01");
+});
 
 test("empty and one-day histories do not create a step projection", () => {
   assert.deepEqual(habitProjection([], "2026-10-04"), {
@@ -105,6 +123,17 @@ test("Future Me summarizes a seven-day sample without filling missing dates", ()
   assert.equal(weekOnly.projectedRecordDays30, 30);
   assert.equal(weekOnly.steps.projectedSteps7, 43_400);
   assert.equal(weekOnly.steps.projectedSteps30, 186_000);
+});
+
+test("cycle notes do not change general-purpose Future Me counts", () => {
+  const entries = [
+    entry("period", "2026-10-04", { startDate: "2026-10-04" }, 1),
+    entry("steps", "2026-10-04", { count: 6_200 }, 2),
+  ];
+  const projection = futureMeProjection(entries, "2026-10-04", 7);
+  assert.equal(projection.observedDays, 1);
+  assert.equal(projection.steps.loggedDays, 1);
+  assert.equal(projection.feelings.loggedDays, 0);
 });
 
 test("Future Me summarizes sparse calorie, sleep, feeling and experiment data from present values only", () => {
@@ -355,6 +384,10 @@ test("period cycle estimates support irregular lengths without inventing missing
   assert.deepEqual(cycleSummary([], "2026-10-04"), {
     cycleDay: null,
     estimatedNextPeriod: null,
+    estimatedCycleLength: null,
+    estimateSource: null,
+    estimateIsPast: false,
+    recentStartIntervals: [],
     history: [],
   });
   const period = entry("period", "2026-09-01", {
@@ -365,6 +398,58 @@ test("period cycle estimates support irregular lengths without inventing missing
   const summary = cycleSummary([period], "2026-10-04");
   assert.equal(summary.cycleDay, 34);
   assert.equal(summary.estimatedNextPeriod, "2026-10-11");
+  assert.equal(summary.estimateSource, "recorded");
+});
+
+test("cycle estimates use the median of recent variable intervals and keep history newest first", () => {
+  const starts = [
+    "2026-01-01",
+    addCalendarDays("2026-01-01", 28),
+    addCalendarDays("2026-01-01", 44),
+    addCalendarDays("2026-01-01", 77),
+  ];
+  const entries = starts.map((start, index) =>
+    entry("period", start, { startDate: start, symptoms: index === 3 ? ["Cramps"] : [] }, index + 1),
+  );
+  const summary = cycleSummary(entries, "2026-03-22");
+
+  assert.equal(summary.cycleDay, 4);
+  assert.equal(summary.estimatedCycleLength, 28);
+  assert.equal(summary.estimatedNextPeriod, "2026-04-16");
+  assert.deepEqual(summary.recentStartIntervals, [33, 16, 28]);
+  assert.deepEqual(summary.history.map((item) => item.date), [...starts].reverse());
+});
+
+test("a single outlying recent interval is recorded but does not drive an estimate", () => {
+  const starts = [
+    "2026-01-01",
+    addCalendarDays("2026-01-01", 28),
+    addCalendarDays("2026-01-01", 56),
+    addCalendarDays("2026-01-01", 176),
+  ];
+  const entries = starts.map((start, index) =>
+    entry("period", start, { startDate: start }, index + 1),
+  );
+  const summary = cycleSummary(entries, "2026-10-04");
+
+  assert.equal(summary.cycleDay, 101);
+  assert.equal(summary.recentStartIntervals[0], 120);
+  assert.equal(summary.estimatedCycleLength, null);
+  assert.equal(summary.estimatedNextPeriod, null);
+});
+
+test("a saved cycle length outside the estimate range remains in history without a prediction", () => {
+  const period = entry("period", "2026-09-01", {
+    startDate: "2026-09-01",
+    cycleLength: 120,
+    symptoms: ["Headache"],
+  });
+  const summary = cycleSummary([period], "2026-10-04");
+
+  assert.equal(summary.cycleDay, 34);
+  assert.equal(summary.estimatedCycleLength, null);
+  assert.equal(summary.estimatedNextPeriod, null);
+  assert.equal(summary.history.length, 1);
 });
 
 test("logging consistency counts unique logged calendar days and energy suggestions stay nonjudgmental", () => {

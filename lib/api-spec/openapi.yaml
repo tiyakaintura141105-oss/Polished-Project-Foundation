@@ -42,6 +42,8 @@ paths:
                 $ref: "#/components/schemas/MyProfileResponse"
         "401":
           description: Authentication required
+        "403":
+          description: Period entries are not available for this profile
     put:
       operationId: saveMyProfile
       tags: [profile]
@@ -118,6 +120,8 @@ paths:
           description: Authentication required
         "403":
           description: Entry not available for this profile
+        "409":
+          description: A cycle entry already exists for the selected start date
   /wellness/entries/{entryKey}:
     delete:
       operationId: deleteWellnessEntry
@@ -372,8 +376,8 @@ components:
           format: date
         cycleLength:
           type: integer
-          minimum: 15
-          maximum: 90
+          minimum: 1
+          maximum: 365
         flow:
           type: string
           maxLength: 120

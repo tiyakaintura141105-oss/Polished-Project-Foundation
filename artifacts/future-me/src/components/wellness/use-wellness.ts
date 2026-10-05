@@ -35,13 +35,14 @@ export function useWellness() {
     });
   };
 
-  const deleteEntry = (entryKey: string) => {
+  const deleteEntry = (entryKey: string, onDeleted?: () => void) => {
     setMessage('');
     setMutationError('');
     remove.mutate({ entryKey }, {
       onSuccess: async () => {
         await client.invalidateQueries({ queryKey: getListWellnessEntriesQueryKey() });
         setMessage('That entry has been removed.');
+        onDeleted?.();
       },
       onError: () => setMutationError('We couldn’t remove that entry. Please try again.'),
     });

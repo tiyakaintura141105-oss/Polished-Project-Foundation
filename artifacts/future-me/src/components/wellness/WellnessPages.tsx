@@ -10,7 +10,7 @@ import type { FeelingWellnessData, Profile, WellnessEntry, WellnessEntryInput } 
 import { useWellness } from './use-wellness';
 import {
   calculateCalorieTarget, calculateStepGoal, dailySeries, entryForDay,
-  energyAction, feelingPatternSummary, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress,
+  canAccessCycleTracking, cycleEntryKey, cycleSummary, energyAction, feelingPatternSummary, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress, visibleEntriesForProfile,
 } from '@/lib/wellness-metrics';
 import './wellness.css';
 
@@ -74,8 +74,8 @@ function LoadingState() {
 function Empty({ title, copy, icon = <Waves size={19} /> }: { title: string; copy: string; icon?: ReactNode }) {
   return <div className="well-empty"><span className="well-empty-icon">{icon}</span><strong>{title}</strong><p>{copy}</p></div>;
 }
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <div className="well-field"><label>{label}</label>{children}</div>;
+function Field({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
+  return <div className="well-field"><label htmlFor={id}>{label}</label>{children}</div>;
 }
 function PeriodSwitch({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   return <div className="well-period-switch" aria-label="Choose time range">
@@ -109,19 +109,23 @@ function QueryState({ retry }: { retry: () => void }) {
 function WellBody({ pageId, profile, wellness }: { pageId: WellnessPageId; profile: Profile; wellness: ReturnType<typeof useWellness> }) {
   if (wellness.query.isLoading) return <Frame><LoadingState /></Frame>;
   if (wellness.query.isError) return <Frame><QueryState retry={() => wellness.query.refetch()} /></Frame>;
-  const common = <Feedback message={wellness.message} error={wellness.mutationError} />;
+  const visibleWellness = {
+    ...wellness,
+    entries: visibleEntriesForProfile(wellness.entries, profile.sex),
+  };
+  const common = <Feedback message={visibleWellness.message} error={visibleWellness.mutationError} />;
   let content: ReactNode;
   switch (pageId) {
-    case 'dashboard': content = <DashboardPage profile={profile} {...wellness} />; break;
-    case 'future-me': content = <FuturePage {...wellness} />; break;
-    case 'experiments': content = <ExperimentsPage {...wellness} />; break;
-    case 'sleep': content = <SleepPage profile={profile} {...wellness} />; break;
-    case 'five-minute': content = <FiveMinutePage {...wellness} />; break;
-    case 'feelings': content = <FeelingsPage profile={profile} {...wellness} />; break;
-    case 'periods': content = <PeriodsPage {...wellness} />; break;
-    case 'history': content = <HistoryPage {...wellness} />; break;
-    case 'insights': content = <InsightsPage {...wellness} />; break;
-    default: content = <DashboardPage profile={profile} {...wellness} />;
+    case 'dashboard': content = <DashboardPage profile={profile} {...visibleWellness} />; break;
+    case 'future-me': content = <FuturePage {...visibleWellness} />; break;
+    case 'experiments': content = <ExperimentsPage {...visibleWellness} />; break;
+    case 'sleep': content = <SleepPage profile={profile} {...visibleWellness} />; break;
+    case 'five-minute': content = <FiveMinutePage {...visibleWellness} />; break;
+    case 'feelings': content = <FeelingsPage profile={profile} {...visibleWellness} />; break;
+    case 'periods': content = <PeriodsPage {...visibleWellness} />; break;
+    case 'history': content = <HistoryPage profile={profile} {...visibleWellness} />; break;
+    case 'insights': content = <InsightsPage profile={profile} {...visibleWellness} />; break;
+    default: content = <DashboardPage profile={profile} {...visibleWellness} />;
   }
   return <Frame>{common}{content}</Frame>;
 }
@@ -182,10 +186,11 @@ function DashboardPage({ profile, entries, save, isSaving }: ReturnType<typeof u
   const [historyDays, setHistoryDays] = useState<7 | 30>(7);
   const [stepError, setStepError] = useState('');
   const [calorieError, setCalorieError] = useState('');
-  const recent = withinDays(entries, 7);
+  const generalWellnessEntries = entries.filter((entry) => entry.kind !== 'period');
+  const recent = withinDays(generalWellnessEntries, 7);
   const loggedDays = new Set(recent.map((entry) => entry.date)).size;
   const weekSteps = dailySeries(entries, 'steps', 7);
-  const future = futureMeProjection(entries, today, 7);
+  const future = futureMeProjection(generalWellnessEntries, today, 7);
   const latestFeeling = sortNewest(entries.filter((entry) => entry.kind === 'feeling'))[0];
   const feel = readData<FeelingData>(latestFeeling)?.feeling;
   const record = (event: FormEvent, kind: 'steps' | 'calories', value: string) => {
@@ -267,13 +272,13 @@ function DashboardPage({ profile, entries, save, isSaving }: ReturnType<typeof u
 function FuturePage({ entries }: ReturnType<typeof useWellness>) {
   const [days, setDays] = useState(7);
   const today = todayISO();
-  const scoped = withinDays(entries, days);
-  const projection = futureMeProjection(entries, today, days);
+  const generalWellnessEntries = entries.filter((entry) => entry.kind !== 'period');
+  const scoped = withinDays(generalWellnessEntries, days);
+  const projection = futureMeProjection(generalWellnessEntries, today, days);
   const checked = projection.observedDays;
   const kinds = [...new Set(scoped.map((entry) => entry.kind))];
   const feelings = scoped.filter((entry) => entry.kind === 'feeling');
   const experimentEntries = scoped.filter((entry) => entry.kind === 'experiment-checkin');
-  const periods = scoped.filter((entry) => entry.kind === 'period');
   const experimentDays = new Set(experimentEntries.map((entry) => entry.date)).size;
   const hasEnoughMovement = projection.steps.projectedSteps7 !== null &&
     projection.steps.projectedSteps30 !== null;
@@ -338,7 +343,7 @@ function FuturePage({ entries }: ReturnType<typeof useWellness>) {
             <div className="well-metric-box"><span>Sleep notes</span><strong>{averageSleepLabel}</strong><small>{projection.sleep.loggedDays} logged nights</small></div>
             <div className="well-metric-box"><span>Completed energy actions</span><strong>{projection.energy.completedActions}</strong><small>{projection.energy.completedActionDays} logged days</small></div>
             <div className="well-metric-box"><span>Experiment check-ins</span><strong>{projection.experiments.checkins ? `${projection.experiments.completed} / ${projection.experiments.checkins} tried` : '—'}</strong><small>{projection.experiments.averageRating === null ? 'No rating recorded' : `Mean rating ${projection.experiments.averageRating} / 5`}</small></div>
-            <div className="well-metric-box"><span>Feelings and periods</span><strong>{projection.feelings.loggedDays} · {periods.length}</strong><small>feeling days · period notes</small></div>
+            <div className="well-metric-box"><span>Feeling notes</span><strong>{projection.feelings.loggedDays}</strong><small>days with a saved feeling note</small></div>
           </div>
           {feelings.length > 0 && projection.feelings.mostLogged && <p className="well-note">You logged a feeling on {projection.feelings.loggedDays} {projection.feelings.loggedDays === 1 ? 'day' : 'days'} in this window. Most frequently named: {titleCase(projection.feelings.mostLogged)}. This counts entries without interpreting them.</p>}
         </> : <div style={{ marginTop: 16 }}><Empty title="A little more time will help" copy={`There are no entries in this ${days}-day window yet. Add a few moments and a pattern can begin to take shape.`} /></div>}
@@ -410,14 +415,29 @@ function entrySummary(entry: WellnessEntry) {
     case 'feeling': return `${titleCase(String(data.feeling))} · intensity ${data.intensity}/10`;
     case 'experiment': return `${String(data.title)} · ${titleCase(String(data.status))}`;
     case 'experiment-checkin': return `Experiment check-in · rating ${data.rating}/5`;
-    case 'period': return `Cycle start logged · ${fmtDate(String(data.startDate))}`;
+    case 'period': {
+      const startDate = typeof data.startDate === 'string' ? data.startDate : entry.date;
+      const details = [
+        `Started ${fmtDate(startDate)}`,
+        typeof data.endDate === 'string' ? `Ended ${fmtDate(data.endDate)}` : '',
+        typeof data.cycleLength === 'number' ? `${data.cycleLength}-day cycle length noted` : '',
+        typeof data.flow === 'string' && data.flow ? `Flow: ${data.flow}` : '',
+        Array.isArray(data.symptoms) && data.symptoms.length ? `Symptoms: ${data.symptoms.join(', ')}` : '',
+        typeof data.mood === 'string' && data.mood ? `Mood: ${data.mood}` : '',
+        typeof data.notes === 'string' && data.notes ? `Note: ${data.notes}` : '',
+      ].filter(Boolean);
+      return details.join(' · ');
+    }
     default: return 'Personal moment logged';
   }
 }
 
-function HistoryPage({ entries, deleteEntry, isSaving }: ReturnType<typeof useWellness>) {
+function HistoryPage({ profile, entries, deleteEntry, isSaving }: ReturnType<typeof useWellness> & { profile: Profile }) {
   const [days, setDays] = useState(7);
-  const records = sortNewest(withinDays(entries, days));
+  const records = sortNewest(withinDays(
+    visibleEntriesForProfile(entries, profile.sex),
+    days,
+  ));
   return <>
     <PageHeading eyebrow="YOUR OWN STORY" title={<>History,<br /><em>without judgement.</em></>} copy="A chronological record of the moments you decided to keep. No entries are added for days you left blank." />
     <div className="well-section-head"><div><span className="well-eyebrow">YOUR RECORD</span><h2>{records.length} {records.length === 1 ? 'entry' : 'entries'}</h2></div><PeriodSwitch value={days} onChange={setDays} /></div>
@@ -432,9 +452,20 @@ function RecordRow({ entry, onDelete, disabled }: { entry: WellnessEntry; onDele
   </div>;
 }
 
-function InsightsPage({ entries }: ReturnType<typeof useWellness>) {
+function InsightsPage({ profile, entries }: ReturnType<typeof useWellness> & { profile: Profile }) {
   const [days, setDays] = useState(7);
-  const scoped = withinDays(entries, days);
+  const visibleEntries = visibleEntriesForProfile(entries, profile.sex);
+  const scoped = withinDays(visibleEntries, days);
+  const cycleNotes = canAccessCycleTracking(profile.sex)
+    ? scoped.filter((entry) => entry.kind === 'period')
+    : [];
+  const symptomCounts = new Map<string, number>();
+  for (const entry of cycleNotes) {
+    const data = readData<PeriodData>(entry);
+    for (const symptom of data?.symptoms ?? []) {
+      symptomCounts.set(symptom, (symptomCounts.get(symptom) ?? 0) + 1);
+    }
+  }
   const daily = new Set(scoped.map((entry) => entry.date)).size;
   const kindCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -459,6 +490,21 @@ function InsightsPage({ entries }: ReturnType<typeof useWellness>) {
           <div className="well-meter-list">{kindCounts.map(([kind, count]) => <div className="well-meter" key={kind}><span>{titleCase(kind)}</span><div className="well-progress"><span style={{ width: `${Math.max(5, (count / Math.max(...kindCounts.map((item) => item[1]))) * 100)}%` }} /></div><strong>{count}</strong></div>)}</div>
           <p className="well-note">A count of your own entries, not a comparison to anyone else.</p>
         </Card>
+        {profile.sex === 'female' && <Card className="cycle-insight-card">
+          <CardHeading label="Cycle notes in this window" icon={<Waves size={17} />} />
+          {cycleNotes.length ? <>
+            <div className="well-stat">{cycleNotes.length} <small>{cycleNotes.length === 1 ? 'cycle start logged' : 'cycle starts logged'}</small></div>
+            {symptomCounts.size > 0
+              ? <div className="cycle-insight-tags" aria-label="Symptoms logged with cycle notes">
+                  {[...symptomCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([symptom, count]) =>
+                    <span className="well-tag" key={symptom}>{symptom} · {count}</span>,
+                  )}
+                </div>
+              : <p className="well-note">No symptoms were added to cycle notes in this window.</p>}
+            <p className="well-note">These are only the details you chose to record; they do not explain or predict how you feel.</p>
+          </> : <p className="well-note">No cycle starts were logged in this window.</p>}
+          <Link className="well-link" href="/periods">Open your private cycle log <ArrowRight size={13} /></Link>
+        </Card>}
       </div>
       <section className="well-section"><div className="well-section-head"><div><span className="well-eyebrow">PLAIN-LANGUAGE SUMMARY</span><h2>What is in the record</h2></div></div>
         <div className="well-grid three">
@@ -800,7 +846,7 @@ function FeelingsPage({ profile, entries, save, isSaving }: ReturnType<typeof us
               {metricSummary('logged energy levels', summary.energy, 'levels')}
               {repeatedOverlap(summary.calories.feelingDaysLogged, 'calorie logging')}
               {repeatedOverlap(summary.experiments.feelingDaysLogged, 'experiment check-ins')}
-              {profile.sex === 'female' && repeatedOverlap(summary.period.feelingDaysLogged, 'period notes')}
+              {profile.sex === 'female' && repeatedOverlap(summary.period.feelingDaysLogged, 'cycle dates')}
               {!summary.possiblePatterns.length && summary.sleep.matchedDays < 2 && summary.steps.matchedDays < 2 && summary.energy.matchedDays < 2 && summary.calories.feelingDaysLogged < 2 && summary.experiments.feelingDaysLogged < 2 && (profile.sex !== 'female' || summary.period.feelingDaysLogged < 2) &&
                 <p className="feeling-neutral-observation" data-testid="text-feeling-neutral-summary">Your saved entries do not show a repeated overlap to describe in this window.</p>}
             </div>
@@ -811,9 +857,10 @@ function FeelingsPage({ profile, entries, save, isSaving }: ReturnType<typeof us
               <span>Energy levels alongside this feeling on {summary.energy.matchedDays} days · recent logged average {summary.energy.recentAverage === null ? 'not available' : `${summary.energy.recentAverage}/100`}</span>
               <span>Calorie totals logged on {summary.calories.daysLogged} days · present on {summary.calories.feelingDaysLogged} selected-feeling days</span>
               <span>Experiment check-ins on {summary.experiments.daysLogged} days · present on {summary.experiments.feelingDaysLogged} selected-feeling days</span>
-              {profile.sex === 'female' && <span>Period notes overlap {summary.period.feelingDaysLogged} selected-feeling days</span>}
+              {profile.sex === 'female' && <span>Logged cycle dates overlap {summary.period.feelingDaysLogged} selected-feeling days</span>}
             </div>
             <p className="feeling-caution">Your logs cannot establish a cause. This is only a record of dates you chose to note.</p>
+            {profile.sex === 'female' && <Link className="well-link feeling-cycle-link" href="/periods">View your private cycle notes <ArrowRight size={13} /></Link>}
           </div> : <div className="feeling-insufficient" role="note" data-testid="text-feeling-insufficient">Keep logging for a few more days and we'll look for patterns.</div>}
         </Card>
       </div>
@@ -839,54 +886,178 @@ function PeriodsPage({ entries, save, isSaving, deleteEntry }: ReturnType<typeof
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [mood, setMood] = useState('');
   const [notes, setNotes] = useState('');
-  const cycles = sortNewest(entries.filter((entry) => entry.kind === 'period'));
-  const cycleData = cycles.map((entry) => ({ entry, data: readData<PeriodData>(entry)! }));
-  const mostRecent = cycleData[0];
-  const averageCycle = (() => {
-    if (mostRecent?.data.cycleLength) return mostRecent.data.cycleLength;
-    if (cycleData.length >= 2) {
-      const gaps = cycleData.slice(0, -1).map((cycle, index) => Math.abs(Math.round((new Date(`${cycleData[index + 1].data.startDate}T12:00:00`).getTime() - new Date(`${cycle.data.startDate}T12:00:00`).getTime()) / 86400000))).filter((gap) => gap >= 15 && gap <= 90);
-      return gaps.length ? Math.round(gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length) : null;
-    }
-    return null;
-  })();
-  const estimatedStart = mostRecent && averageCycle ? dateOffset(mostRecent.data.startDate, averageCycle) : null;
-  const toggleSymptom = (item: string) => setSymptoms((current) => current.includes(item) ? current.filter((value) => value !== item) : [...current, item]);
+  const [editingKey, setEditingKey] = useState('');
+  const [formError, setFormError] = useState('');
+  const cycle = cycleSummary(entries, todayISO());
+  const cycleData = cycle.history.map((entry) => ({
+    entry,
+    data: {
+      ...(readData<PeriodData>(entry) ?? { startDate: entry.date }),
+      startDate: readData<PeriodData>(entry)?.startDate || entry.date,
+    },
+  }));
+  const latest = cycleData[0];
+  const intervalRange = cycle.recentStartIntervals.filter((length) => length >= 15 && length <= 90);
+  const symptomCounts = new Map<string, number>();
+  cycleData.forEach(({ data }) => (data.symptoms ?? []).forEach((symptom) =>
+    symptomCounts.set(symptom, (symptomCounts.get(symptom) ?? 0) + 1),
+  ));
+  const symptomHistory = cycleData.filter(({ data }) =>
+    (data.symptoms?.length ?? 0) > 0 || Boolean(data.mood),
+  );
+  const resetForm = () => {
+    setStartDate(todayISO());
+    setEndDate('');
+    setCycleLength('');
+    setFlow('');
+    setSymptoms([]);
+    setMood('');
+    setNotes('');
+    setEditingKey('');
+    setFormError('');
+  };
+  const toggleSymptom = (item: string) => setSymptoms((current) => {
+    if (item === 'No symptoms') return current.includes(item) ? [] : [item];
+    const withoutNoSymptoms = current.filter((value) => value !== 'No symptoms');
+    return withoutNoSymptoms.includes(item)
+      ? withoutNoSymptoms.filter((value) => value !== item)
+      : [...withoutNoSymptoms, item];
+  });
+  const editCycle = (entry: WellnessEntry, data: PeriodData) => {
+    setEditingKey(entry.key);
+    setStartDate(data.startDate || entry.date);
+    setEndDate(data.endDate ?? '');
+    setCycleLength(data.cycleLength === undefined ? '' : String(data.cycleLength));
+    setFlow(data.flow ?? '');
+    setSymptoms(Array.isArray(data.symptoms) ? data.symptoms : []);
+    setMood(data.mood ?? '');
+    setNotes(data.notes ?? '');
+    setFormError('');
+  };
   const logCycle = (event: FormEvent) => {
     event.preventDefault();
-    if (endDate && endDate < startDate) return;
+    if (!startDate || startDate > todayISO()) {
+      setFormError('Choose a start date that is today or earlier.');
+      return;
+    }
+    if (endDate && (endDate < startDate || endDate > todayISO())) {
+      setFormError('Choose an end date between the start date and today.');
+      return;
+    }
+    const parsedCycleLength = cycleLength === '' ? undefined : Number(cycleLength);
+    if (parsedCycleLength !== undefined &&
+      (!Number.isInteger(parsedCycleLength) || parsedCycleLength < 1 || parsedCycleLength > 365)) {
+      setFormError('Enter a whole cycle length from 1 to 365 days, or leave it blank.');
+      return;
+    }
+    if (flow.length > 120 || mood.length > 80 || notes.length > 1000 || symptoms.length > 20) {
+      setFormError('Keep flow notes under 120 characters, mood under 80, notes under 1,000, and symptoms to 20.');
+      return;
+    }
+    const duplicateStart = cycleData.some(({ entry }) =>
+      entry.key !== editingKey && entry.date === startDate,
+    );
+    if (duplicateStart) {
+      setFormError('You already have a cycle note for that start date. Edit that note instead.');
+      return;
+    }
+    setFormError('');
     const data: PeriodData = {
-      startDate, endDate: endDate || undefined, cycleLength: cycleLength ? Number(cycleLength) : undefined,
+      startDate, endDate: endDate || undefined, cycleLength: parsedCycleLength,
       flow: flow || undefined, symptoms: symptoms.length ? symptoms : undefined, mood: mood || undefined, notes: notes.trim() || undefined,
     };
-    save(makeInput(dateKey('period', startDate), 'period', startDate, data), 'Cycle note saved. Dates remain yours to interpret.');
-    setEndDate(''); setCycleLength(''); setFlow(''); setSymptoms([]); setMood(''); setNotes('');
+    const key = cycleEntryKey(startDate, editingKey);
+    save(
+      makeInput(key, 'period', startDate, data),
+      editingKey ? 'Your cycle note has been updated.' : 'Cycle note saved. Dates remain yours to interpret.',
+      resetForm,
+    );
   };
   return <>
-    <PageHeading eyebrow="YOUR BODY, YOUR RHYTHM" title={<>Periods,<br /><em>simply recorded.</em></>} copy="A private place to keep cycle dates and notes. Dates ahead are estimates from your own logs, never a diagnosis." />
+    <PageHeading eyebrow="YOUR BODY, YOUR RHYTHM" title={<>Periods,<br /><em>simply recorded.</em></>} copy="A private place for cycle dates and notes. Any date ahead is an estimate based only on your own logs." />
     <div className="well-grid two">
       <Card>
-        <CardHeading label="Add a cycle note" icon={<Waves size={17} />} />
+        <CardHeading label={editingKey ? 'Edit a cycle note' : 'Add a cycle note'} icon={<Waves size={17} />} />
+        {editingKey && <p className="well-callout cycle-editing-note">You’re editing a saved cycle note. The original entry will be updated.</p>}
         <form className="well-form" onSubmit={logCycle}>
-          <div className="well-form-row"><Field label="Start date"><input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} required data-testid="input-period-start" /></Field><Field label="End date (optional)"><input type="date" min={startDate} value={endDate} onChange={(event) => setEndDate(event.target.value)} data-testid="input-period-end" /></Field></div>
-          <div className="well-form-row"><Field label="Cycle length (optional)"><input type="number" min="15" max="90" placeholder="Days" value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} data-testid="input-period-length" /></Field><Field label="Flow (optional)"><select value={flow} onChange={(event) => setFlow(event.target.value)} data-testid="select-period-flow"><option value="">Choose if useful</option>{['Light', 'Medium', 'Heavy', 'Spotting', 'Prefer not to say'].map((value) => <option key={value} value={value}>{value}</option>)}</select></Field></div>
+          <div className="well-form-row">
+            <Field label="Period start date" id="input-period-start"><input id="input-period-start" type="date" max={todayISO()} value={startDate} onChange={(event) => setStartDate(event.target.value)} required data-testid="input-period-start" /></Field>
+            <Field label="Period end date (optional)" id="input-period-end"><input id="input-period-end" type="date" min={startDate} max={todayISO()} value={endDate} onChange={(event) => setEndDate(event.target.value)} data-testid="input-period-end" /></Field>
+          </div>
+          <div className="well-form-row">
+            <Field label="Cycle length in days (optional)" id="input-period-length"><input id="input-period-length" type="number" min="1" max="365" step="1" inputMode="numeric" placeholder="Days" value={cycleLength} onChange={(event) => setCycleLength(event.target.value)} data-testid="input-period-length" /></Field>
+            <Field label="Flow notes (optional)" id="input-period-flow"><input id="input-period-flow" maxLength={120} value={flow} onChange={(event) => setFlow(event.target.value)} placeholder="Anything you want to note" data-testid="input-period-flow" /></Field>
+          </div>
+          <p className="well-inline-note">Your values stay in your history. Estimates use recorded lengths or recent start-to-start intervals from 15 to 90 days; wider values won’t drive an estimate.</p>
           <div className="well-field"><span className="well-label">Symptoms, if you want to note them</span><div className="well-check-row">{cycleSymptoms.map((item) => <label key={item}><input type="checkbox" checked={symptoms.includes(item)} onChange={() => toggleSymptom(item)} data-testid={`checkbox-period-symptom-${item.toLowerCase().replaceAll(' ', '-')}`} />{item}</label>)}</div></div>
-          <div className="well-form-row"><Field label="Mood (optional)"><input maxLength={80} value={mood} onChange={(event) => setMood(event.target.value)} placeholder="Your words" data-testid="input-period-mood" /></Field><Field label="A note (optional)"><input maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Anything to remember" data-testid="input-period-notes" /></Field></div>
-          <div className="well-actions"><button className="well-btn" type="submit" disabled={isSaving} data-testid="button-save-period"><Check size={14} /> Save cycle note</button></div>
+          <div className="well-form-row">
+            <Field label="Mood (optional)" id="input-period-mood"><input id="input-period-mood" maxLength={80} value={mood} onChange={(event) => setMood(event.target.value)} placeholder="Your words" data-testid="input-period-mood" /></Field>
+            <Field label="Other notes (optional)" id="input-period-notes"><textarea id="input-period-notes" maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Anything you want to remember" data-testid="input-period-notes" /></Field>
+          </div>
+          {formError && <div className="well-error" role="alert" data-testid="error-period-form">{formError}</div>}
+          <div className="well-actions">
+            <button className="well-btn" type="submit" disabled={isSaving} data-testid="button-save-period"><Check size={14} /> {isSaving ? 'Saving…' : editingKey ? 'Update cycle note' : 'Save cycle note'}</button>
+            {editingKey && <button className="well-btn ghost" type="button" onClick={resetForm} disabled={isSaving} data-testid="button-cancel-period-edit">Cancel edit</button>}
+          </div>
         </form>
       </Card>
-      <Card>
-        <CardHeading label="A date, clearly estimated" icon={<CalendarDays size={17} />} />
-        {estimatedStart ? <>
-          <span className="well-overline">POSSIBLE NEXT START · ESTIMATE</span>
-          <div className="well-stat" style={{ marginTop: 10 }}>{fmtDate(estimatedStart, { month: 'long', day: 'numeric' })}</div>
-          <p className="well-note">Based on a {averageCycle}-day interval from your own recorded cycle. Bodies vary; this date may not match what happens.</p>
-        </> : <Empty title="Not enough cycle history yet" copy="Log a cycle length or another start date before an estimate can be shown. Nothing is predicted from a single unmeasured date." icon={<CalendarDays size={18} />} />}
-        <div className="well-callout" style={{ marginTop: 15 }}>Cycle dates can vary. This tool only organizes the information you add and cannot assess symptoms or health.</div>
+      <Card className="cycle-snapshot-card">
+        <CardHeading label="Your cycle, from your notes" icon={<CalendarDays size={17} />} />
+        <div className="cycle-snapshot-grid">
+          <div className="well-metric-box"><span>Current cycle day</span><strong data-testid="text-current-cycle-day">{cycle.cycleDay ?? '—'}</strong><small>{latest ? `From ${fmtDate(latest.data.startDate)}` : 'Add a start date to begin'}</small></div>
+          <div className="well-metric-box cycle-estimate-box"><span>Estimated next period</span>
+            <strong data-testid="text-estimated-next-period">{cycle.estimatedNextPeriod ? fmtDate(cycle.estimatedNextPeriod, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</strong>
+            <small>Estimate only</small>
+          </div>
+        </div>
+        {cycle.estimatedNextPeriod
+          ? <p className="well-note">{cycle.estimateSource === 'recorded'
+              ? `Based on the ${cycle.estimatedCycleLength}-day length you recorded most recently.`
+              : `Based on the median of your recent logged intervals (${cycle.estimatedCycleLength} days).`}
+            {intervalRange.length > 1 ? ` Recent recorded intervals range from ${Math.min(...intervalRange)} to ${Math.max(...intervalRange)} days.` : ''} This may not match what happens.
+          </p>
+          : cycle.estimateIsPast
+            ? <p className="well-note" data-testid="text-cycle-estimate-past">The previous estimate has passed based on the dates saved. Add a new start date for an updated estimate.</p>
+            : latest
+              ? <p className="well-note">There isn’t enough recent information for an estimate yet. A single start date alone is not used to project one.</p>
+              : <p className="well-note">Your current cycle day and any next-period date will appear after you choose to log a start date.</p>}
+        <div className="well-callout cycle-privacy-note"><strong>Private to your signed-in account.</strong> Dates ahead are estimates, not medical predictions. This record does not diagnose or infer a condition.</div>
       </Card>
     </div>
-    <section className="well-section"><div className="well-section-head"><div><span className="well-eyebrow">YOUR CYCLE LOG</span><h2>{cycles.length} {cycles.length === 1 ? 'cycle note' : 'cycle notes'}</h2></div></div>
-      {cycleData.length ? <div className="well-record-list">{cycleData.map(({ entry, data }) => <div className="well-record" key={entry.key}><div className="well-record-main"><span className="well-record-icon"><Waves size={15} /></span><div><div className="well-record-title">Started {fmtDate(data.startDate)}</div><div className="well-record-meta">{data.endDate ? `Ended ${fmtDate(data.endDate)}` : 'End date not recorded'}{data.flow ? ` · ${data.flow} flow` : ''}{data.symptoms?.length ? ` · ${data.symptoms.join(', ')}` : ''}{data.mood ? ` · ${data.mood}` : ''}</div></div></div><button type="button" className="well-btn ghost small" disabled={isSaving} onClick={() => { if (window.confirm('Remove this cycle note from your personal record?')) deleteEntry(entry.key); }} aria-label={`Delete cycle note from ${fmtDate(data.startDate)}`}><Trash2 size={13} /> Remove</button></div>)}</div> : <Empty title="Your cycle history starts with you" copy="No dates are filled in. Add a note only when you choose." icon={<Waves size={18} />} />}
+    <section className="well-section cycle-history-section"><div className="well-section-head"><div><span className="well-eyebrow">YOUR OWN RECORD</span><h2>Cycle history</h2></div><span className="well-inline-note">{cycleData.length} {cycleData.length === 1 ? 'start logged' : 'starts logged'}</span></div>
+      {cycleData.length ? <div className="well-record-list">{cycleData.map(({ entry, data }) => <div className="well-record cycle-history-row" key={entry.key} data-testid={`row-cycle-history-${entry.id}`}>
+        <div className="well-record-main"><span className="well-record-icon"><Waves size={15} /></span><div>
+          <div className="well-record-title">Started {fmtDate(data.startDate)}</div>
+          <div className="well-record-meta">
+            {data.endDate ? `Ended ${fmtDate(data.endDate)}` : 'End date not recorded'}
+            {data.cycleLength !== undefined ? ` · ${data.cycleLength}-day length noted` : ''}
+            {data.flow ? ` · Flow: ${data.flow}` : ''}
+            {data.symptoms?.length ? ` · ${data.symptoms.join(', ')}` : ''}
+            {data.mood ? ` · Mood: ${data.mood}` : ''}
+            {data.notes ? ` · ${data.notes}` : ''}
+          </div>
+        </div></div>
+        <div className="well-actions cycle-row-actions">
+          <button type="button" className="well-btn secondary small" disabled={isSaving} onClick={() => editCycle(entry, data)} aria-label={`Edit cycle note from ${fmtDate(data.startDate)}`} data-testid={`button-edit-period-${entry.id}`}>Edit</button>
+          <button type="button" className="well-btn ghost small" disabled={isSaving} onClick={() => { if (window.confirm('Remove this cycle note from your private record?')) deleteEntry(entry.key, () => { if (editingKey === entry.key) resetForm(); }); }} aria-label={`Delete cycle note from ${fmtDate(data.startDate)}`} data-testid={`button-delete-period-${entry.id}`}><Trash2 size={13} /> Remove</button>
+        </div>
+      </div>)}</div> : <Empty title="Your cycle history starts with you" copy="No dates are filled in. Add a note only when you choose." icon={<Waves size={18} />} />}
+    </section>
+    <section className="well-section symptom-history-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">ONLY WHAT YOU CHOSE TO NOTE</span><h2>Symptom history</h2></div></div>
+      {symptomHistory.length ? <>
+        {symptomCounts.size > 0 && <div className="cycle-symptom-counts" aria-label="Counts of symptoms you recorded">
+          {[...symptomCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([symptom, count]) =>
+            <span className="well-tag" key={symptom}>{symptom} · {count} {count === 1 ? 'note' : 'notes'}</span>,
+          )}
+        </div>}
+        <div className="well-record-list">{symptomHistory.map(({ entry, data }) => <div className="well-record symptom-history-row" key={entry.key}>
+          <span className="well-record-main"><span className="well-record-icon"><Heart size={15} /></span><span>
+            <span className="well-record-title">{fmtDate(data.startDate)}</span>
+            <span className="well-record-meta">{data.symptoms?.length ? data.symptoms.join(', ') : 'No symptoms noted'}{data.mood ? ` · Mood: ${data.mood}` : ''}</span>
+          </span></span>
+        </div>)}</div>
+      </> : <Empty title="No symptom notes yet" copy="Symptoms and mood are optional. Only details you choose to add will appear here." icon={<Heart size={18} />} />}
     </section>
   </>;
 }

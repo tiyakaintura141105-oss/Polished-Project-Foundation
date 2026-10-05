@@ -50,6 +50,23 @@ export function entriesOfKind(
     .sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
 }
 
+export function canAccessCycleTracking(sex: Profile["sex"]): boolean {
+  return sex === "female";
+}
+
+export function visibleEntriesForProfile(
+  entries: WellnessEntry[],
+  sex: Profile["sex"],
+): WellnessEntry[] {
+  return canAccessCycleTracking(sex)
+    ? entries
+    : entries.filter((entry) => entry.kind !== "period");
+}
+
+export function cycleEntryKey(startDate: string, editingKey?: string): string {
+  return editingKey || `period-${startDate}`;
+}
+
 export function entryForDay(
   entries: WellnessEntry[],
   kind: WellnessEntryKind,
@@ -204,7 +221,6 @@ export type FutureMeProjection = {
     completed: number;
     averageRating: number | null;
   };
-  periodEntries: number;
 };
 
 export function futureMeProjection(
@@ -215,7 +231,10 @@ export function futureMeProjection(
   const safeDays = Number.isInteger(days) && days > 0 ? days : 30;
   const first = addCalendarDays(through, -(safeDays - 1));
   const windowEntries = entries.filter(
-    (entry) => entry.date >= first && entry.date <= through,
+    (entry) =>
+      entry.date >= first &&
+      entry.date <= through &&
+      entry.kind !== "period",
   );
   const completedEnergyEntries = entriesOfKind(windowEntries, "energy")
     .filter(isCompletedEnergyAction);
@@ -318,7 +337,6 @@ export function futureMeProjection(
         ? Math.round((ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length) * 10) / 10
         : null,
     },
-    periodEntries: entriesOfKind(windowEntries, "period").length,
   };
 }
 
@@ -513,8 +531,8 @@ export function cycleSummary(entries: WellnessEntry[], today = localDay()) {
     if (previous && previous.entry.updatedAt > entry.updatedAt) continue;
     const cycleLength = typeof data.cycleLength === "number" &&
         Number.isInteger(data.cycleLength) &&
-        data.cycleLength >= 15 &&
-        data.cycleLength <= 90
+        data.cycleLength >= 1 &&
+        data.cycleLength <= 365
       ? data.cycleLength
       : null;
     recordsByStart.set(startDate, { entry, cycleLength });
@@ -541,18 +559,30 @@ export function cycleSummary(entries: WellnessEntry[], today = localDay()) {
     .slice(0, 4)
     .slice(1)
     .map((older, index) => dayDifference(older.startDate, records[index].startDate))
-    .filter((interval) => interval >= 15 && interval <= 90);
-  const sortedIntervals = [...recentStartIntervals].sort((left, right) => left - right);
+    .filter((interval) => interval >= 1 && interval <= 365);
+  const estimateIntervals = recentStartIntervals.filter(
+    (interval) => interval >= 15 && interval <= 90,
+  );
+  const mostRecentIntervalIsUsable =
+    recentStartIntervals.length === 0 ||
+    (recentStartIntervals[0] >= 15 && recentStartIntervals[0] <= 90);
+  const sortedIntervals = [...estimateIntervals].sort((left, right) => left - right);
   const middle = Math.floor(sortedIntervals.length / 2);
   const intervalMedian = sortedIntervals.length === 0
     ? null
     : sortedIntervals.length % 2 === 1
       ? sortedIntervals[middle]
       : Math.round((sortedIntervals[middle - 1] + sortedIntervals[middle]) / 2);
-  const estimatedCycleLength = latest.cycleLength ?? intervalMedian;
-  const estimateSource = latest.cycleLength !== null
+  const recordedEstimate = latest.cycleLength !== null &&
+      latest.cycleLength >= 15 &&
+      latest.cycleLength <= 90
+    ? latest.cycleLength
+    : null;
+  const estimatedCycleLength = recordedEstimate ??
+    (mostRecentIntervalIsUsable ? intervalMedian : null);
+  const estimateSource = recordedEstimate !== null
     ? "recorded" as const
-    : intervalMedian !== null
+    : estimatedCycleLength !== null
       ? "recent-start-intervals" as const
       : null;
   const projectedDate = estimatedCycleLength === null

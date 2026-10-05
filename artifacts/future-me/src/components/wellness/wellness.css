@@ -410,3 +410,24 @@
   .feeling-shortcuts { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .feeling-history-filter { grid-template-columns:1fr; gap:6px; }
 }
+
+.cycle-snapshot-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.cycle-snapshot-grid .well-metric-box { min-width:0; }
+.cycle-snapshot-grid .well-metric-box strong { overflow-wrap:anywhere; font-size:clamp(18px,2.5vw,25px); }
+.cycle-snapshot-grid .well-metric-box small { display:block; margin-top:5px; color:#8a9b8c; font-size:8px; line-height:1.5; }
+.cycle-snapshot-card .well-callout { margin-top:15px; }
+.cycle-privacy-note { border-left-color:#b9a983; background:#f8f5eb; color:#81785f; }
+.cycle-privacy-note strong { color:#6e644b; }
+.cycle-history-row { align-items:flex-start; }
+.cycle-row-actions { flex:none; justify-content:flex-end; }
+.cycle-editing-note { margin:0 0 2px; }
+.cycle-symptom-counts,.cycle-insight-tags { display:flex; flex-wrap:wrap; gap:7px; margin:10px 0 13px; }
+.symptom-history-row .well-record-main > span:last-child { display:grid; gap:3px; }
+.cycle-insight-card { background:#fafbf6; }
+.cycle-insight-card .well-link { margin-top:10px; }
+.feeling-cycle-link { margin-top:10px; }
+@media (max-width:600px) {
+  .cycle-snapshot-grid { grid-template-columns:1fr; }
+  .cycle-history-row { align-items:flex-start; flex-direction:column; }
+  .cycle-row-actions { width:100%; justify-content:flex-start; }
+}
