@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap');
 @layer theme, base, clerk, components, utilities;
 @import 'tailwindcss';
 @import 'tw-animate-css';
@@ -29,49 +29,49 @@
 
 :root {
   color-scheme: light;
-  --background: 155 32% 96%;
-  --foreground: 167 29% 17%;
-  --border: 153 20% 86%;
-  --input: 153 20% 86%;
-  --card: 0 0% 100%;
-  --card-foreground: 167 29% 17%;
-  --primary: 164 37% 31%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 153 26% 91%;
-  --secondary-foreground: 167 29% 22%;
-  --muted: 152 20% 91%;
-  --muted-foreground: 164 12% 47%;
-  --accent: 37 62% 76%;
-  --accent-foreground: 167 29% 20%;
-  --destructive: 3 61% 51%;
+  --background: 44 34% 96%;
+  --foreground: 156 24% 20%;
+  --border: 142 17% 84%;
+  --input: 142 17% 84%;
+  --card: 45 30% 99%;
+  --card-foreground: 156 24% 20%;
+  --primary: 151 29% 34%;
+  --primary-foreground: 44 34% 97%;
+  --secondary: 132 23% 90%;
+  --secondary-foreground: 156 24% 23%;
+  --muted: 136 17% 91%;
+  --muted-foreground: 151 13% 41%;
+  --accent: 37 46% 73%;
+  --accent-foreground: 156 24% 20%;
+  --destructive: 5 48% 43%;
   --destructive-foreground: 0 0% 100%;
-  --ring: 164 37% 31%;
+  --ring: 151 29% 34%;
   --app-font-sans: 'DM Sans', sans-serif;
-  --app-font-display: 'Manrope', sans-serif;
-  --radius: 1rem;
-  --shadow-soft: 0 18px 48px rgba(28, 65, 55, .07);
-  --elevate-1: rgba(26, 72, 59, .035);
-  --elevate-2: rgba(26, 72, 59, .07);
+  --app-font-display: 'Instrument Serif', Georgia, serif;
+  --radius: 1.1rem;
+  --shadow-soft: 0 16px 44px rgba(39, 66, 51, .055);
+  --elevate-1: rgba(26, 72, 59, .03);
+  --elevate-2: rgba(26, 72, 59, .06);
 }
 .dark {
   color-scheme: dark;
-  --background: 165 22% 10%;
-  --foreground: 150 20% 91%;
-  --border: 164 15% 25%;
-  --input: 164 15% 25%;
-  --card: 165 20% 14%;
-  --card-foreground: 150 20% 91%;
-  --primary: 158 40% 58%;
-  --primary-foreground: 167 29% 12%;
-  --secondary: 164 16% 21%;
-  --secondary-foreground: 150 20% 91%;
-  --muted: 164 16% 21%;
-  --muted-foreground: 155 13% 65%;
-  --accent: 37 52% 56%;
-  --accent-foreground: 167 29% 12%;
-  --destructive: 3 61% 56%;
+  --background: 152 20% 12%;
+  --foreground: 42 25% 91%;
+  --border: 150 13% 27%;
+  --input: 150 13% 27%;
+  --card: 153 19% 16%;
+  --card-foreground: 42 25% 91%;
+  --primary: 145 29% 57%;
+  --primary-foreground: 152 20% 12%;
+  --secondary: 150 14% 23%;
+  --secondary-foreground: 42 25% 91%;
+  --muted: 150 14% 23%;
+  --muted-foreground: 144 12% 69%;
+  --accent: 37 42% 58%;
+  --accent-foreground: 152 20% 12%;
+  --destructive: 5 48% 55%;
   --destructive-foreground: 0 0% 100%;
-  --ring: 158 40% 58%;
+  --ring: 145 29% 57%;
 }
 @layer base {
   * { @apply border-border; }
@@ -430,4 +430,59 @@
 
 @media (prefers-reduced-motion: reduce) {
   *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
+}
+
+/* Quiet editorial polish: soft limestone, botanical ink, and paper-like surfaces. */
+:root { --well-editorial: 'Instrument Serif', Georgia, serif; }
+body { background:#f5f4ec; }
+.app-shell { background:#f5f4ec; }
+.sidebar { background:#e8ede4; border-right-color:#d7dfd3; }
+.brand-name { font-family:var(--well-editorial); font-size:26px; font-weight:400; letter-spacing:-.035em; }
+.brand-name span { color:#78957c; }
+.brand-mark { border-radius:50% 50% 45% 50%; background:#416c56; }
+.side-link { min-height:47px; border-radius:11px; font-size:12px; }
+.side-link-active { background:#f6f6ed; box-shadow:none; }
+.main-column { background:#f5f4ec; }
+.topbar { background:rgba(248,247,240,.88); border-bottom-color:#e0e3d8; }
+.content-wrap { width:min(1220px,100%); padding-top:42px; }
+.greeting,.hero h1,.principles-intro h2,.landing-final h2,.setup-title,.page-heading h1 { font-family:var(--well-editorial); font-weight:400; letter-spacing:-.035em; }
+.greeting { line-height:1; }
+.well-title,.well-section-head h2,.well-dark-copy h2,.well-metric-box strong,.well-empty strong,.well-dialog-head h2 { font-family:var(--well-editorial); font-weight:400; letter-spacing:-.025em; }
+.well-title { font-size:clamp(43px,5.2vw,66px); }
+.well-card { border-color:#e1e3d8; border-radius:18px; background:#fbfaf4; box-shadow:none; }
+.well-btn,.button { border-radius:10px; }
+.button-primary { box-shadow:none; }
+.notice-card { box-shadow:none; border-radius:17px; background:#fbfaf4; }
+.side-note { background:#f0f1e8; }
+.noise { opacity:.014; }
+@media (min-width:761px) and (max-width:1100px) {
+  .content-wrap { padding-left:30px; padding-right:30px; }
+  .sidebar { width:218px; }
+  .main-column { width:calc(100% - 218px); margin-left:218px; }
+}
+@media (max-width:760px) {
+  .content-wrap { padding:28px 18px 28px; }
+  .topbar { padding:0 16px; }
+  .topbar-context { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .topbar-mark { flex:none; }
+  .well-title { font-size:clamp(42px,12vw,56px); }
+  .sidebar { background:#e8ede4; }
+}
+@media (max-width:360px) {
+  .content-wrap { padding-left:14px; padding-right:14px; }
+  .topbar-context { max-width:150px; }
+  .topbar-mark { letter-spacing:.06em; }
+  .well-card { padding:15px; }
+  .landing-nav { padding-inline:12px; }
+  .landing-nav-actions { gap:8px; }
+  .brand { gap:7px; }
+  .brand-name { font-size:18px; }
+  .nav-cta { min-height:38px; padding-inline:8px; font-size:9px; }
+  .nav-signin { font-size:10px; }
+}
+:focus-visible { outline:3px solid #8aa583; outline-offset:3px; }
+@media (max-width:760px) {
+  .mobile-menu { width:44px; height:44px; }
+  .mobile-close { width:44px; height:44px; }
+  .sidebar { overflow-y:auto; }
 }

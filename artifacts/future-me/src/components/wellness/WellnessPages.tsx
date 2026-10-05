@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Link } from 'wouter';
 import {
@@ -12,6 +12,7 @@ import {
   calculateCalorieTarget, calculateStepGoal, dailySeries, entryForDay,
   canAccessCycleTracking, cycleEntryKey, cycleSummary, energyAction, feelingPatternSummary, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress, visibleEntriesForProfile,
 } from '@/lib/wellness-metrics';
+import { buildWellnessInsights, type InsightPoint } from '@/lib/wellness-insights';
 import './wellness.css';
 
 export type WellnessPageId = 'dashboard' | 'future-me' | 'experiments' | 'sleep' | 'five-minute' | 'feelings' | 'periods' | 'history' | 'insights';
@@ -77,23 +78,9 @@ function Empty({ title, copy, icon = <Waves size={19} /> }: { title: string; cop
 function Field({ label, id, children }: { label: string; id?: string; children: ReactNode }) {
   return <div className="well-field"><label htmlFor={id}>{label}</label>{children}</div>;
 }
-function PeriodSwitch({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function PeriodSwitch({ value, onChange }: { value: number; onChange: (value: 7 | 30) => void }) {
   return <div className="well-period-switch" aria-label="Choose time range">
-    {[7, 30].map((day) => <button type="button" key={day} aria-pressed={day === value} onClick={() => onChange(day)} data-testid={`button-period-${day}`}>{day} days</button>)}
-  </div>;
-}
-function Chart({ entries, days }: { entries: WellnessEntry[]; days: number }) {
-  const data = Array.from({ length: days }, (_, index) => {
-    const date = dateOffset(todayISO(), index - (days - 1));
-    return { date, count: entries.filter((entry) => entry.date === date).length };
-  });
-  const max = Math.max(1, ...data.map((item) => item.count));
-  const labelsEvery = days === 7 ? 1 : 5;
-  return <div className="well-chart" role="img" aria-label={`Number of personal check-ins recorded each day over ${days} days`}>
-    {data.map((item, index) => <div className="well-chart-col" key={item.date} title={`${fmtDate(item.date)}: ${item.count} ${item.count === 1 ? 'entry' : 'entries'}`}>
-      <b>{item.count || ''}</b><span className="well-chart-bar" style={{ height: `${Math.max(item.count ? 12 : 3, (item.count / max) * 100)}%` }} />
-      {(days === 7 || index % labelsEvery === 0 || index === days - 1) && <small>{new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' }).format(new Date(`${item.date}T12:00:00`))}</small>}
-    </div>)}
+    {([7, 30] as const).map((day) => <button type="button" key={day} aria-pressed={day === value} onClick={() => onChange(day)} data-testid={`button-period-${day}`}>{day} days</button>)}
   </div>;
 }
 function Frame({ children }: { children: ReactNode }) {
@@ -191,8 +178,8 @@ function DashboardPage({ profile, entries, save, isSaving }: ReturnType<typeof u
   const loggedDays = new Set(recent.map((entry) => entry.date)).size;
   const weekSteps = dailySeries(entries, 'steps', 7);
   const future = futureMeProjection(generalWellnessEntries, today, 7);
-  const latestFeeling = sortNewest(entries.filter((entry) => entry.kind === 'feeling'))[0];
-  const feel = readData<FeelingData>(latestFeeling)?.feeling;
+  const todayFeeling = readData<FeelingData>(entryForDay(entries, 'feeling', today))?.feeling;
+  const todayRecords = entries.filter((entry) => entry.date === today && entry.kind !== 'period');
   const record = (event: FormEvent, kind: 'steps' | 'calories', value: string) => {
     event.preventDefault();
     const count = Number(value);
@@ -206,66 +193,85 @@ function DashboardPage({ profile, entries, save, isSaving }: ReturnType<typeof u
   };
   const remainingCalories = calorieTarget === null || calories === undefined ? null : Math.max(0, calorieTarget - calories);
   const caloriePercent = calorieTarget === null ? 0 : Math.min(100, Math.round(((calories ?? 0) / calorieTarget) * 100));
+  const dashboardInsights = buildWellnessInsights(generalWellnessEntries, 7, today, false);
+  const nextStep = todayRecords.length === 0
+    ? { title: 'Start with one small note', detail: 'Choose the detail that feels easiest to remember today.', href: '/five-minute', action: 'Check in with your energy' }
+    : dashboardInsights.recommendedFocus;
   return <>
     <PageHeading eyebrow="YOUR DAILY SPACE" title={<>Good to see you,<br /><em>{profile.name.split(' ')[0]}.</em></>} copy="A few useful things to notice today. No score to chase, just your own rhythm." date />
-    <div className="well-grid dashboard-grid">
-      <Card className="movement-card">
-        <CardHeading label="Steps · today" icon={<Footprints size={17} />} />
-        <div className="well-steps-title"><div className="well-stat" data-testid="text-steps-today">{steps === undefined ? '—' : steps.toLocaleString()}</div><small>steps logged</small></div>
-        <div className="steps-stage" aria-live="polite">{stepState.message}</div>
-        <div className="well-progress step-progress" role="progressbar" aria-label="Steps toward personalized estimated target" aria-valuemin={0} aria-valuemax={stepTarget} aria-valuenow={Math.min(steps ?? 0, stepTarget)}><span style={{ width: `${stepState.percent}%` }} /></div>
-        <div className="well-progress-caption"><span>Personalized estimate · {stepTarget.toLocaleString()}</span><span>{stepState.percent}%</span></div>
-        <div className="step-remaining">{steps === undefined ? 'Log today when it suits you.' : stepState.remaining > 0 ? `${stepState.remaining.toLocaleString()} to the estimated target` : 'You reached the estimated target today.'}</div>
-        <details className="well-estimate-details">
-          <summary>How this estimate is shaped</summary>
-          <p>It starts at 7,000 steps, then adjusts in small increments for your activity level, age band, height, weight, sex, and goal. Activity adjustments range from −500 to +1,000; age, height, weight, sex, and goal also adjust the estimate. It is rounded to the nearest 500 and kept between 4,000 and 12,000 steps. This is a product heuristic, not a medical recommendation.</p>
-        </details>
-        <form className="well-form" onSubmit={(event) => record(event, 'steps', stepValue)} style={{ marginTop: 15 }}>
-          <div className="well-form-row"><Field label={steps === undefined ? 'Add today’s steps' : 'Update today’s steps'}><input type="number" min="0" max="150000" step="1" inputMode="numeric" placeholder="e.g. 4,250" value={stepValue} onChange={(event) => { setStepValue(event.target.value); setStepError(''); }} required data-testid="input-steps-count" /></Field><div className="well-field"><label aria-hidden="true">&nbsp;</label><button className="well-btn" type="submit" disabled={isSaving || !stepValue} data-testid="button-log-steps">{isSaving ? 'Saving…' : steps === undefined ? 'Save steps' : 'Update steps'}</button></div></div>
-          {stepError && <span className="field-error" role="alert">{stepError}</span>}
-        </form>
-        <p className="well-note">This profile-based reference is an estimate, not a medically optimal goal or advice.</p>
-      </Card>
-      <Card className="dark">
-        <div className="well-dark-copy">
-          <CardHeading label="Future Me · from your own notes" icon={<Sparkles size={17} />} />
-          {future.steps.projectedSteps30 !== null
-            ? <><h2>{future.steps.average!.toLocaleString()} steps per logged day.</h2><p>At the same logged-day pace, your step notes add up to about {future.steps.projectedSteps30!.toLocaleString()} steps in 30 days. This is arithmetic from recorded behavior, not a health forecast.</p></>
-            : <><h2>Your Future Me becomes smarter as you log more.</h2><p>Three step-log days in the last week are needed for a simple continuation example. No missing days are filled in.</p></>}
-        </div>
-        <div className="well-actions" style={{ position: 'relative', zIndex: 1, marginTop: 23 }}><Link className="well-btn secondary" href="/future-me">Explore Future Me <ArrowRight size={14} /></Link></div>
-      </Card>
-    </div>
-    <div className="well-grid two well-section">
-      <Card className="steps-history-card">
-        <CardHeading label="Your last seven days of steps" icon={<CalendarDays size={17} />} />
-        <NumericTrend entries={entries} kind="steps" days={7} label="Daily steps" />
-        <div className="well-record-list compact-daily-list">{weekSteps.filter((day) => day.value !== null).slice().reverse().map((day) => <div className="well-record" key={day.date}><span className="well-record-title">{fmtDate(day.date)}</span><strong className="well-record-value">{day.value?.toLocaleString()} steps</strong></div>)}</div>
-        {!weekSteps.some((day) => day.value !== null) && <p className="well-note">No step totals have been recorded in this seven-day window. Blank days stay blank.</p>}
-      </Card>
-      <Card className="calorie-card">
-        <CardHeading label="Calories · today" icon={<Activity size={17} />} />
-        <span className="well-overline">Estimated daily calorie target</span>
-        {calorieTarget === null
-          ? <div className="well-no-target" data-testid="text-calorie-no-target"><strong>No target shown</strong><div className="well-no-target-today">{calories === undefined ? 'Nothing logged today' : `${calories.toLocaleString()} kcal logged today`}</div><p>Your profile does not support a responsible estimate here. Since there is no target, remaining and progress are not calculated. You can still record a daily total.</p></div>
-          : <><div className="well-stat calorie-stat">{calorieTarget.toLocaleString()} <small>kcal / day</small></div><div className="well-progress calorie-progress" role="progressbar" aria-label="Calories logged compared with estimated target" aria-valuemin={0} aria-valuemax={calorieTarget} aria-valuenow={Math.min(calories ?? 0, calorieTarget)}><span style={{ width: `${caloriePercent}%` }} /></div><div className="well-progress-caption"><span>{calories === undefined ? 'Nothing logged today' : `${calories.toLocaleString()} kcal logged`}</span><span>{calories === undefined ? '—' : `${caloriePercent}%`}</span></div><p className="well-note">{calories === undefined ? 'Remaining appears after you log today.' : `${remainingCalories?.toLocaleString()} kcal to the estimated reference.`}</p></>}
-        <form className="well-form" onSubmit={(event) => record(event, 'calories', calorieValue)} style={{ marginTop: 13 }}>
-          <div className="well-form-row"><Field label={calories === undefined ? 'Log today’s total' : 'Update today’s total'}><input type="number" min="0" max="20000" step="1" inputMode="numeric" placeholder="kcal, if useful" value={calorieValue} onChange={(event) => { setCalorieValue(event.target.value); setCalorieError(''); }} required data-testid="input-calories-count" /></Field><div className="well-field"><label aria-hidden="true">&nbsp;</label><button className="well-btn calorie-button" type="submit" disabled={isSaving || !calorieValue} data-testid="button-log-calories">{isSaving ? 'Saving…' : calories === undefined ? 'Save total' : 'Update total'}</button></div></div>
-          {calorieError && <span className="field-error" role="alert">{calorieError}</span>}
-        </form>
-        <p className="well-note">This estimate uses your profile age, body measurements, sex, usual activity, and personal focus. It is not exact, medically optimal, or advice. Logging is optional and does not need to match a target.</p>
-        <details className="well-estimate-details calorie-estimate-details">
-          <summary>How this estimate is shaped</summary>
-          <p>A resting-energy estimate uses your age, height, weight, and sex profile, then an activity multiplier (1.2–1.725) and a small goal adjustment (−200, +200, or 0 kcal). The result is rounded to 50 kcal. For adults only, the app shows it when the result is within its supported 1,200–5,500 kcal range; otherwise, no target is displayed. It is a rough reference, not nutrition advice or an exact requirement.</p>
-        </details>
-        <div className="history-switch-row"><span className="well-overline">CALORIE LOG HISTORY</span><PeriodSwitch value={historyDays} onChange={(value) => setHistoryDays(value as 7 | 30)} /></div>
-        <NumericTrend entries={entries} kind="calories" days={historyDays} label={`${historyDays}-day calorie history`} />
-      </Card>
-    </div>
-    <div className="well-grid two well-section">
-      <Card><CardHeading label="Your week, so far" icon={<CalendarDays size={17} />} /><div className="well-data-grid"><div className="well-data-cell"><span>Days with a note</span><strong>{loggedDays} / 7</strong></div><div className="well-data-cell"><span>Recent check-in</span><strong>{feel ? titleCase(feel) : '—'}</strong></div><div className="well-data-cell"><span>Entries this week</span><strong>{recent.length}</strong></div></div><p className="well-note">Your record only reflects what you’ve chosen to add. An empty day is simply an unrecorded day.</p></Card>
-      <Card><CardHeading label="A small next step" icon={<Compass size={17} />} /><p className="well-note">Pick up where you are. Any one note is enough to build a more personal picture over time.</p><div className="well-shortcuts compact-shortcuts"><Link className="well-shortcut" href="/sleep"><Moon size={18} /><span>Note your sleep</span></Link><Link className="well-shortcut" href="/experiments"><Sparkles size={18} /><span>Try an experiment</span></Link><Link className="well-shortcut" href="/future-me"><ArrowUpRight size={18} /><span>See your patterns</span></Link><Link className="well-shortcut" href="/history"><History size={18} /><span>Look back gently</span></Link></div></Card>
-    </div>
+    <section className="dashboard-state" data-testid="panel-today-state">
+      <div className="dashboard-state-mark"><Sun size={18} /></div>
+      <div><span className="well-overline">TODAY, AS IT IS</span><h2>{todayRecords.length ? 'A few things have made it into your record.' : 'There is room for today to unfold.'}</h2><p>{todayRecords.length ? `${todayRecords.length} ${todayRecords.length === 1 ? 'moment' : 'moments'} noted${todayFeeling ? ` · feeling ${titleCase(todayFeeling)}` : ''}.` : 'No notes yet today. That is simply a blank page, not a missed day.'}</p></div>
+      <div className="dashboard-state-date"><span>{fmtDate(today, { weekday: 'short' })}</span><strong>{fmtDate(today, { day: 'numeric' })}</strong></div>
+    </section>
+    <section className="dashboard-progress-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">TODAY’S PROGRESS</span><h2>Notice what you’ve logged</h2></div><span className="dashboard-progress-caption">Your own pace, no score to chase</span></div>
+      <div className="dashboard-progress-grid">
+        <Card className="movement-card">
+          <CardHeading label="Movement · steps" icon={<Footprints size={17} />} />
+          <div className="well-steps-title"><div className="well-stat" data-testid="text-steps-today">{steps === undefined ? '—' : steps.toLocaleString()}</div><small>steps noted</small></div>
+          <div className="steps-stage" aria-live="polite">{steps === undefined ? 'Whenever it feels useful' : stepState.message}</div>
+          <div className="well-progress step-progress" role="progressbar" aria-label="Steps toward personalized estimated reference" aria-valuemin={0} aria-valuemax={stepTarget} aria-valuenow={Math.min(steps ?? 0, stepTarget)}><span style={{ width: `${stepState.percent}%` }} /></div>
+          <div className="well-progress-caption"><span>Profile-based reference · {stepTarget.toLocaleString()}</span><span>{steps === undefined ? '—' : `${stepState.percent}%`}</span></div>
+          <div className="step-remaining">{steps === undefined ? 'An estimate, never a requirement.' : stepState.remaining > 0 ? `${stepState.remaining.toLocaleString()} to the reference` : 'You reached the estimated reference today.'}</div>
+          <form className="well-form" onSubmit={(event) => record(event, 'steps', stepValue)} style={{ marginTop: 15 }}>
+            <div className="well-form-row"><Field label={steps === undefined ? 'Add today’s steps' : 'Update today’s steps'}><input type="number" min="0" max="150000" step="1" inputMode="numeric" placeholder="e.g. 4,250" value={stepValue} onChange={(event) => { setStepValue(event.target.value); setStepError(''); }} required data-testid="input-steps-count" /></Field><div className="well-field"><label aria-hidden="true">&nbsp;</label><button className="well-btn" type="submit" disabled={isSaving || !stepValue} data-testid="button-log-steps">{isSaving ? 'Saving…' : steps === undefined ? 'Save steps' : 'Update steps'}</button></div></div>
+            {stepError && <span className="field-error" role="alert">{stepError}</span>}
+          </form>
+          <details className="well-estimate-details"><summary>How this estimate is shaped</summary><p>It starts at 7,000 steps, then adjusts in small increments for your profile and is rounded to the nearest 500 between 4,000 and 12,000. It is a product heuristic, not medical advice.</p></details>
+        </Card>
+        <Card className="calorie-card dashboard-calorie-card">
+          <CardHeading label="Nutrition · calorie totals" icon={<Activity size={17} />} />
+          {calorieTarget === null
+            ? <div className="well-no-target" data-testid="text-calorie-no-target"><strong>No target shown</strong><div className="well-no-target-today">{calories === undefined ? 'Nothing logged today' : `${calories.toLocaleString()} kcal logged today`}</div><p>Your profile does not support an estimate here. You can still record a daily total, if useful.</p></div>
+            : <><span className="well-overline">Estimated daily reference</span><div className="well-stat calorie-stat">{calorieTarget.toLocaleString()} <small>kcal / day</small></div><div className="well-progress calorie-progress" role="progressbar" aria-label="Calories logged compared with estimated reference" aria-valuemin={0} aria-valuemax={calorieTarget} aria-valuenow={Math.min(calories ?? 0, calorieTarget)}><span style={{ width: `${caloriePercent}%` }} /></div><div className="well-progress-caption"><span>{calories === undefined ? 'Nothing logged today' : `${calories.toLocaleString()} kcal logged`}</span><span>{calories === undefined ? '—' : `${caloriePercent}%`}</span></div><p className="well-note">{calories === undefined ? 'Your total appears here when you choose to log it.' : `${remainingCalories?.toLocaleString()} kcal to the estimated reference.`}</p></>}
+          <form className="well-form" onSubmit={(event) => record(event, 'calories', calorieValue)} style={{ marginTop: 13 }}>
+            <div className="well-form-row"><Field label={calories === undefined ? 'Log today’s calorie total' : 'Update today’s total'}><input type="number" min="0" max="20000" step="1" inputMode="numeric" placeholder="kcal, if useful" value={calorieValue} onChange={(event) => { setCalorieValue(event.target.value); setCalorieError(''); }} required data-testid="input-calories-count" /></Field><div className="well-field"><label aria-hidden="true">&nbsp;</label><button className="well-btn calorie-button" type="submit" disabled={isSaving || !calorieValue} data-testid="button-log-calories">{isSaving ? 'Saving…' : calories === undefined ? 'Save total' : 'Update total'}</button></div></div>
+            {calorieError && <span className="field-error" role="alert">{calorieError}</span>}
+          </form>
+          <p className="well-note">Calories are optional daily totals—not meal logs or nutrition advice.</p>
+          <details className="well-estimate-details calorie-estimate-details"><summary>About this estimate</summary><p>The profile-based estimate is a rough reference, not exact, medically optimal, or advice. Logging does not need to match a target.</p></details>
+        </Card>
+      </div>
+    </section>
+    <Card className="dashboard-future-card dark">
+      <div className="well-dark-copy">
+        <CardHeading label="FUTURE ME · FROM YOUR OWN NOTES" icon={<Sparkles size={17} />} />
+        {future.steps.projectedSteps30 !== null
+          ? <><h2>{future.steps.average!.toLocaleString()} steps per logged day.</h2><p>At the same recorded pace, your step notes add up to about {future.steps.projectedSteps30!.toLocaleString()} steps in 30 days. Arithmetic from your behavior, not a health forecast.</p></>
+          : <><h2>Your next chapter is taking shape.</h2><p>Three step-log days in the last week are needed for a simple continuation example. Nothing is filled in for the days you left blank.</p></>}
+      </div>
+      <div className="well-actions dashboard-future-action"><Link className="well-btn secondary" href="/future-me">Explore Future Me <ArrowRight size={14} /></Link></div>
+    </Card>
+    <section className="dashboard-next-step" data-testid="panel-personalized-action">
+      <div><span className="well-overline">A PERSONAL NEXT STEP</span><h2>{nextStep.title}</h2><p>{'detail' in nextStep ? nextStep.detail : `A small invitation based on your recent notes. ${dashboardInsights.biggestOpportunity}`}</p></div>
+      <Link href={nextStep.href} className="well-btn">{'action' in nextStep ? nextStep.action : nextStep.actionLabel}<ArrowRight size={15} /></Link>
+    </section>
+    <section className="dashboard-shortcuts-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">PICK UP WHERE YOU ARE</span><h2>Ways to check in</h2></div></div>
+      <div className="dashboard-shortcuts">
+        <Link className="dashboard-shortcut" href="/sleep"><span><Moon size={17} /></span><strong>Sleep</strong><small>Note last night</small><ArrowUpRight size={15} /></Link>
+        <Link className="dashboard-shortcut" href="/five-minute"><span><Clock3 size={17} /></span><strong>Five minutes</strong><small>Meet your energy</small><ArrowUpRight size={15} /></Link>
+        <Link className="dashboard-shortcut" href="/feelings"><span><Heart size={17} /></span><strong>Feelings</strong><small>Name what’s here</small><ArrowUpRight size={15} /></Link>
+        <Link className="dashboard-shortcut" href="/experiments"><span><Sparkles size={17} /></span><strong>Experiments</strong><small>Notice something new</small><ArrowUpRight size={15} /></Link>
+      </div>
+    </section>
+    <section className="dashboard-recent-insights" data-testid="panel-recent-insights">
+      <div className="well-section-head"><div><span className="well-eyebrow">THE LAST SEVEN DAYS</span><h2>A little perspective</h2></div><Link className="well-link" href="/insights">See all insights <ArrowRight size={14} /></Link></div>
+      <div className="dashboard-insight-columns">
+        <div><span>YOUR MOST CONSISTENT THREAD</span><p>{dashboardInsights.mostConsistentHabit}</p></div>
+        <div><span>AN OBSERVATION</span><p>{dashboardInsights.strongestPositive}</p></div>
+        <div className="dashboard-week-number"><strong>{loggedDays}<small> / 7</small></strong><span>days with a note</span></div>
+      </div>
+      <p className="well-note">Empty days are not zero data; these notes use only what you chose to record.</p>
+    </section>
+    <section className="dashboard-trends">
+      <div className="well-section-head"><div><span className="well-eyebrow">LOOKING BACK</span><h2>Your recent totals</h2></div><PeriodSwitch value={historyDays} onChange={(value) => setHistoryDays(value as 7 | 30)} /></div>
+      <div className="well-grid two">
+        <Card className="steps-history-card"><CardHeading label="Step totals" icon={<Footprints size={17} />} /><NumericTrend entries={entries} kind="steps" days={historyDays} label={`${historyDays}-day step history`} /><p className="well-note">{weekSteps.some((day) => day.value !== null) ? 'Bars appear only on dates with a saved total.' : 'No step totals have been recorded this week. Blank days stay blank.'}</p></Card>
+        <Card className="calorie-card"><CardHeading label="Calorie totals" icon={<Activity size={17} />} /><NumericTrend entries={entries} kind="calories" days={historyDays} label={`${historyDays}-day calorie history`} /><p className="well-note">Calorie totals reflect only daily values you chose to save.</p></Card>
+      </div>
+    </section>
   </>;
 }
 
@@ -413,8 +419,26 @@ function entrySummary(entry: WellnessEntry) {
     case 'sleep': return `${Math.floor(Number(data.durationMinutes) / 60)}h ${Number(data.durationMinutes) % 60}m sleep noted`;
     case 'energy': return `${Number(data.level)}% energy · ${String(data.action ?? 'action selected')}${data.completed ? ' · completed' : ''}`;
     case 'feeling': return `${titleCase(String(data.feeling))} · intensity ${data.intensity}/10`;
-    case 'experiment': return `${String(data.title)} · ${titleCase(String(data.status))}`;
-    case 'experiment-checkin': return `Experiment check-in · rating ${data.rating}/5`;
+    case 'experiment': {
+      const details = [
+        `${String(data.title ?? 'Personal experiment')} · ${titleCase(String(data.status ?? 'active'))}`,
+        typeof data.goal === 'string' ? `Aim: ${data.goal}` : '',
+        typeof data.durationDays === 'number' ? `${data.durationDays} days` : '',
+        Array.isArray(data.metrics) && data.metrics.length ? `Noticing: ${data.metrics.join(', ')}` : '',
+        typeof data.notes === 'string' && data.notes ? `Note: ${data.notes}` : '',
+      ].filter(Boolean);
+      return details.join(' · ');
+    }
+    case 'experiment-checkin': {
+      const details = [
+        'Experiment check-in',
+        typeof data.phase === 'string' ? titleCase(data.phase) : '',
+        typeof data.completed === 'boolean' ? data.completed ? 'Completed' : 'Not completed' : '',
+        typeof data.rating === 'number' ? `Rating ${data.rating}/5` : '',
+        typeof data.note === 'string' && data.note ? `Note: ${data.note}` : '',
+      ].filter(Boolean);
+      return details.join(' · ');
+    }
     case 'period': {
       const startDate = typeof data.startDate === 'string' ? data.startDate : entry.date;
       const details = [
@@ -433,88 +457,127 @@ function entrySummary(entry: WellnessEntry) {
 }
 
 function HistoryPage({ profile, entries, deleteEntry, isSaving }: ReturnType<typeof useWellness> & { profile: Profile }) {
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState<7 | 30>(7);
   const records = sortNewest(withinDays(
     visibleEntriesForProfile(entries, profile.sex),
     days,
   ));
+  const grouped = records.reduce<{ date: string; entries: WellnessEntry[] }[]>((groups, entry) => {
+    const latestGroup = groups[groups.length - 1];
+    if (latestGroup?.date === entry.date) latestGroup.entries.push(entry);
+    else groups.push({ date: entry.date, entries: [entry] });
+    return groups;
+  }, []);
   return <>
-    <PageHeading eyebrow="YOUR OWN STORY" title={<>History,<br /><em>without judgement.</em></>} copy="A chronological record of the moments you decided to keep. No entries are added for days you left blank." />
-    <div className="well-section-head"><div><span className="well-eyebrow">YOUR RECORD</span><h2>{records.length} {records.length === 1 ? 'entry' : 'entries'}</h2></div><PeriodSwitch value={days} onChange={setDays} /></div>
-    {records.length ? <div className="well-record-list">{records.map((entry) => <RecordRow key={entry.key} entry={entry} onDelete={() => { if (window.confirm('Remove this entry from your history?')) deleteEntry(entry.key); }} disabled={isSaving} />)}</div> : <Empty title="Nothing recorded in this window" copy="Choose a wider time range or add a note when you feel ready. An empty stretch is still yours." icon={<History size={19} />} />}
+    <PageHeading eyebrow="YOUR OWN STORY" title={<>History,<br /><em>as it happened.</em></>} copy="A dated record of the moments you chose to keep. Each entry stays in its own category, and the quiet days remain blank." />
+    <div className="history-overview">
+      <div><span className="well-overline">YOUR RECORD · {days} DAYS</span><strong data-testid="text-history-count">{records.length}</strong><span>{records.length === 1 ? 'saved moment' : 'saved moments'} across {grouped.length} {grouped.length === 1 ? 'day' : 'days'}</span></div>
+      <PeriodSwitch value={days} onChange={setDays} />
+    </div>
+    <p className="history-quiet-note"><CalendarDays size={15} /> Empty days are not zero data. Only the moments you chose to log appear here.</p>
+    {grouped.length ? <div className="history-day-groups" data-testid="list-history-records">
+      {grouped.map((group) => <section className="history-day-group" key={group.date} aria-label={fmtDate(group.date)}>
+        <div className="history-day-label"><time dateTime={group.date}>{fmtDate(group.date, { weekday: 'long', month: 'long', day: 'numeric' })}</time><span>{group.entries.length} {group.entries.length === 1 ? 'entry' : 'entries'}</span></div>
+        <div className="well-record-list">{group.entries.map((entry) => <RecordRow key={`${entry.key}-${entry.id}`} entry={entry} onDelete={() => { if (window.confirm('Remove this entry from your history?')) deleteEntry(entry.key); }} disabled={isSaving} />)}</div>
+      </section>)}
+    </div> : <Empty title="Nothing recorded in this window" copy="Choose a wider time range or add a note when you feel ready. An empty stretch is still yours." icon={<History size={19} />} />}
   </>;
 }
 function RecordRow({ entry, onDelete, disabled }: { entry: WellnessEntry; onDelete: () => void; disabled: boolean }) {
   const icons: Record<string, ReactNode> = { steps: <Footprints size={15} />, calories: <Activity size={15} />, sleep: <Moon size={15} />, feeling: <Heart size={15} />, energy: <Clock3 size={15} />, experiment: <Sparkles size={15} />, 'experiment-checkin': <Check size={15} />, period: <Waves size={15} /> };
   return <div className="well-record" data-testid={`row-history-${entry.id}`}>
-    <div className="well-record-main"><span className="well-record-icon">{icons[entry.kind] ?? <Waves size={15} />}</span><div><div className="well-record-title">{titleCase(entry.kind)} <span className="well-record-meta">· {fmtDate(entry.date)}</span></div><div className="well-record-meta">{entrySummary(entry)}</div></div></div>
+    <div className="well-record-main"><span className="well-record-icon">{icons[entry.kind] ?? <Waves size={15} />}</span><div className="history-record-copy"><div className="well-record-title">{titleCase(entry.kind)}</div><div className="well-record-meta">{entrySummary(entry)}</div></div></div>
     <button className="well-btn ghost small" type="button" onClick={onDelete} disabled={disabled} aria-label={`Delete ${entry.kind} entry from ${fmtDate(entry.date)}`} data-testid={`button-delete-entry-${entry.id}`}><Trash2 size={13} /> Remove</button>
   </div>;
 }
 
+function formatInsightValue(value: number | null, metric: string) {
+  if (value === null) return 'No entry';
+  if (metric === 'sleep') return `${Math.floor(value / 60)}h ${value % 60}m`;
+  if (metric === 'steps') return `${Math.round(value).toLocaleString()} steps`;
+  if (metric === 'nutrition') return `${Math.round(value).toLocaleString()} kcal`;
+  if (metric === 'energy') return `${Math.round(value)}%`;
+  if (metric === 'feelings') return `${Math.round(value)}/10`;
+  if (metric === 'period') return `${value} ${value === 1 ? 'period note' : 'period notes'}`;
+  return `${value} ${value === 1 ? 'check-in' : 'check-ins'}`;
+}
+
+function InsightChart({ points, metric, days }: { points: InsightPoint[]; metric: string; days: 7 | 30 }) {
+  const present = points.flatMap((point) => point.value === null ? [] : [point.value]);
+  const max = Math.max(1, ...present);
+  const accessibleValues = points.flatMap((point) => point.value === null
+    ? []
+    : [`${fmtDate(point.date, { weekday: 'long', month: 'long', day: 'numeric' })}: ${formatInsightValue(point.value, metric)}`]);
+  const accessibleSummary = accessibleValues.length
+    ? `${accessibleValues.length} logged days. ${accessibleValues.join('; ')}`
+    : `No valid entries in this ${days}-day window.`;
+  return <div className={`insight-chart insight-chart-${days}`} role="img" aria-label={`${metric} entries by day for ${days} days. ${accessibleSummary} Blank days have no saved entry.`}>
+    {points.map((point, index) => {
+      const value = point.value;
+      const label = new Intl.DateTimeFormat('en', { weekday: days === 7 ? 'short' : undefined, day: days === 30 ? 'numeric' : undefined }).format(new Date(`${point.date}T12:00:00`));
+      const showLabel = days === 7 || index === 0 || index === points.length - 1 || index % 5 === 0;
+      return <div className={`insight-chart-day ${value === null ? 'is-empty' : ''}`} key={point.date} title={`${fmtDate(point.date)}: ${formatInsightValue(value, metric)}`}>
+        <span className="insight-chart-value">{days === 7 && value !== null ? formatInsightValue(value, metric) : ''}</span>
+        <span className="insight-chart-rail"><i style={{ transform: `scaleY(${value === null ? 0 : Math.max(.08, value / max)})` }} /></span>
+        <small>{showLabel ? label : ''}</small>
+      </div>;
+    })}
+  </div>;
+}
+
 function InsightsPage({ profile, entries }: ReturnType<typeof useWellness> & { profile: Profile }) {
-  const [days, setDays] = useState(7);
+  const [days, setDays] = useState<7 | 30>(7);
   const visibleEntries = visibleEntriesForProfile(entries, profile.sex);
-  const scoped = withinDays(visibleEntries, days);
-  const cycleNotes = canAccessCycleTracking(profile.sex)
-    ? scoped.filter((entry) => entry.kind === 'period')
-    : [];
-  const symptomCounts = new Map<string, number>();
-  for (const entry of cycleNotes) {
-    const data = readData<PeriodData>(entry);
-    for (const symptom of data?.symptoms ?? []) {
-      symptomCounts.set(symptom, (symptomCounts.get(symptom) ?? 0) + 1);
-    }
-  }
-  const daily = new Set(scoped.map((entry) => entry.date)).size;
-  const kindCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    scoped.forEach((entry) => counts.set(entry.kind, (counts.get(entry.kind) ?? 0) + 1));
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
-  }, [scoped]);
-  const sleepEntries = scoped.filter((entry) => entry.kind === 'sleep');
-  const meanSleep = sleepEntries.length
-    ? Math.round(sleepEntries.reduce((sum, entry) => sum + Number((entry.data as WellnessData).durationMinutes || 0), 0) / sleepEntries.length)
-    : null;
-  const stepEntries = scoped.filter((entry) => entry.kind === 'steps');
-  const meanSteps = stepEntries.length
-    ? Math.round(stepEntries.reduce((sum, entry) => sum + Number((entry.data as WellnessData).count || 0), 0) / stepEntries.length)
-    : null;
+  const insights = buildWellnessInsights(visibleEntries, days, todayISO(), canAccessCycleTracking(profile.sex));
+  const allSeries = [
+    { id: 'activity', title: 'Everyday movement', kicker: 'ACTIVITY', value: insights.activity.averageSteps === null ? null : `${insights.activity.averageSteps.toLocaleString()} steps`, detail: `${insights.activity.loggedDays} of ${days} days with a step total`, metric: 'steps', series: insights.series.activity, icon: <Footprints size={17} />, note: 'Step totals recorded on days you chose to track.' },
+    { id: 'nutrition', title: 'Calorie totals', kicker: 'NUTRITION LOGS', value: insights.nutrition.averageCalories === null ? null : `${insights.nutrition.averageCalories.toLocaleString()} kcal`, detail: `${insights.nutrition.loggedDays} of ${days} days with a calorie total`, metric: 'nutrition', series: insights.series.nutrition, icon: <Activity size={17} />, note: 'These are calorie totals, not meal or food logs.' },
+    { id: 'sleep', title: 'Sleep notes', kicker: 'SLEEP', value: insights.sleep.averageMinutes === null ? null : `${Math.floor(insights.sleep.averageMinutes / 60)}h ${insights.sleep.averageMinutes % 60}m`, detail: `${insights.sleep.loggedDays} of ${days} days with sleep recorded`, metric: 'sleep', series: insights.series.sleep, icon: <Moon size={17} />, note: insights.sleep.bedtimeVariationMinutes === null ? 'Bedtime timing needs at least two valid notes to compare.' : `Bedtimes varied by about ${Math.floor(insights.sleep.bedtimeVariationMinutes / 60)}h ${insights.sleep.bedtimeVariationMinutes % 60}m in this window.` },
+    { id: 'energy', title: 'Energy check-ins', kicker: 'ENERGY', value: insights.energy.averageLevel === null ? null : `${insights.energy.averageLevel}%`, detail: `${insights.energy.loggedDays} of ${days} days with an energy note`, metric: 'energy', series: insights.series.energy, icon: <Sun size={17} />, note: 'An average of your recorded energy levels only.' },
+    { id: 'feelings', title: 'Feelings you named', kicker: 'FEELINGS', value: insights.feelings.mostLogged ? titleCase(insights.feelings.mostLogged) : null, detail: `${insights.feelings.loggedDays} of ${days} days with a feeling note`, metric: 'feelings', series: insights.series.feelings, icon: <Heart size={17} />, note: insights.feelings.counts.length ? `Most often noted: ${insights.feelings.counts.map((item) => `${titleCase(item.label)} (${item.count})`).join(' · ')}.` : 'Intensity averages and named feelings use only valid saved notes.' },
+    { id: 'experiments', title: 'Experiments in practice', kicker: 'EXPERIMENTS', value: insights.experiments.checkins ? `${insights.experiments.checkins} check-ins` : insights.experiments.activeExperiments.length ? `${insights.experiments.activeExperiments.length} active` : null, detail: `${insights.experiments.checkinDays} days with check-ins · ${insights.experiments.activeExperiments.length} active experiments`, metric: 'experiments', series: insights.series.experiments, icon: <Sparkles size={17} />, note: insights.experiments.activeExperiments.length ? `Currently active: ${insights.experiments.activeExperiments.map((experiment) => experiment.title).join(', ')}.${insights.experiments.averageRating === null ? '' : ` Average check-in rating: ${insights.experiments.averageRating} of 5.`}` : insights.experiments.averageRating === null ? 'Ratings will appear here after experiment check-ins.' : `Average check-in rating: ${insights.experiments.averageRating} of 5.` },
+  ];
+  const periodSeries = canAccessCycleTracking(profile.sex) && insights.period ? {
+    id: 'period', title: 'Cycle notes', kicker: 'OPTIONAL PERIOD LOG', value: insights.period.loggedStarts ? `${insights.period.loggedStarts} ${insights.period.loggedStarts === 1 ? 'note' : 'notes'}` : null,
+    detail: `${insights.period.loggedStarts} period ${insights.period.loggedStarts === 1 ? 'entry' : 'entries'} recorded in this window`,
+    metric: 'period', series: insights.period.series, icon: <Waves size={17} />,
+    note: insights.period.symptoms.length ? `Symptoms noted: ${insights.period.symptoms.map((item) => `${item.label} (${item.count})`).join(' · ')}.` : 'Only cycle details you chose to record are included.',
+  } : null;
+  const areas = periodSeries ? [...allSeries, periodSeries] : allSeries;
+  const dataPoints = areas.reduce((sum, area) => sum + area.series.filter((point) => point.value !== null).length, 0);
   return <>
-    <PageHeading eyebrow="A WIDER VIEW" title={<>Insights,<br /><em>shaped by you.</em></>} copy="Simple summaries of the notes you have chosen to keep. They describe what was logged, not why it happened." />
-    <div className="well-section-head"><div><span className="well-eyebrow">YOUR WINDOW</span><h2>{days} days of your record</h2></div><PeriodSwitch value={days} onChange={setDays} /></div>
-    {scoped.length ? <>
-      <div className="well-grid two">
-        <Card><CardHeading label="A rhythm of check-ins" icon={<Activity size={17} />} /><div className="well-stat">{daily} <small>days with entries</small></div><Chart entries={scoped} days={days} /><p className="well-note">Bars count your saved entries each day. They do not indicate a score or a goal.</p></Card>
-        <Card><CardHeading label="What you chose to track" icon={<Compass size={17} />} />
-          <div className="well-meter-list">{kindCounts.map(([kind, count]) => <div className="well-meter" key={kind}><span>{titleCase(kind)}</span><div className="well-progress"><span style={{ width: `${Math.max(5, (count / Math.max(...kindCounts.map((item) => item[1]))) * 100)}%` }} /></div><strong>{count}</strong></div>)}</div>
-          <p className="well-note">A count of your own entries, not a comparison to anyone else.</p>
-        </Card>
-        {profile.sex === 'female' && <Card className="cycle-insight-card">
-          <CardHeading label="Cycle notes in this window" icon={<Waves size={17} />} />
-          {cycleNotes.length ? <>
-            <div className="well-stat">{cycleNotes.length} <small>{cycleNotes.length === 1 ? 'cycle start logged' : 'cycle starts logged'}</small></div>
-            {symptomCounts.size > 0
-              ? <div className="cycle-insight-tags" aria-label="Symptoms logged with cycle notes">
-                  {[...symptomCounts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([symptom, count]) =>
-                    <span className="well-tag" key={symptom}>{symptom} · {count}</span>,
-                  )}
-                </div>
-              : <p className="well-note">No symptoms were added to cycle notes in this window.</p>}
-            <p className="well-note">These are only the details you chose to record; they do not explain or predict how you feel.</p>
-          </> : <p className="well-note">No cycle starts were logged in this window.</p>}
-          <Link className="well-link" href="/periods">Open your private cycle log <ArrowRight size={13} /></Link>
-        </Card>}
+    <PageHeading eyebrow="A WIDER VIEW" title={<>Your patterns,<br /><em>in context.</em></>} copy="A thoughtful read of the details you have chosen to log. These notes describe what appears in your record, never what caused it." />
+    <div className="insight-window-bar">
+      <div><span className="well-overline">A WINDOW INTO YOUR RECORD</span><strong data-testid="text-insights-window">{days} days</strong><span>{insights.window.start} <span aria-hidden="true">—</span> {insights.window.end}</span></div>
+      <PeriodSwitch value={days} onChange={setDays} />
+    </div>
+    <section className="insight-reading" aria-label="A few things to notice">
+      <div className="insight-reading-heading"><span className="insight-reading-mark"><Compass size={18} /></span><div><span className="well-overline">A FEW THINGS TO NOTICE</span><h2>What your notes are showing</h2></div></div>
+    <div className="insight-reading-grid">
+        <article><span>Strongest positive change</span><p data-testid="text-insight-positive">{insights.strongestPositive}</p></article>
+        <article><span>Biggest opportunity</span><p data-testid="text-insight-opportunity">{insights.biggestOpportunity}</p></article>
+        <article><span>Most consistent habit</span><p data-testid="text-insight-consistency">{insights.mostConsistentHabit}</p></article>
       </div>
-      <section className="well-section"><div className="well-section-head"><div><span className="well-eyebrow">PLAIN-LANGUAGE SUMMARY</span><h2>What is in the record</h2></div></div>
-        <div className="well-grid three">
-          <div className="well-metric-box"><span>Entries noted</span><strong>{scoped.length}</strong></div>
-          <div className="well-metric-box"><span>Average steps per movement log</span><strong>{meanSteps === null ? '—' : meanSteps.toLocaleString()}</strong></div>
-          <div className="well-metric-box"><span>Average sleep per sleep log</span><strong>{meanSleep === null ? '—' : `${Math.floor(meanSleep / 60)}h ${meanSleep % 60}m`}</strong></div>
-        </div>
-        <p className="well-note" style={{ marginTop: 12 }}>{meanSleep === null && meanSteps === null ? 'No movement or sleep averages can be shown from this window yet.' : 'Averages use only the matching entries you logged in this window. They do not establish cause or effect.'}</p>
-      </section>
-    </> : <Empty title="Your insights need your own notes" copy="Once you have saved a few moments, this space will summarize only the patterns that are actually present in your record." icon={<Sparkles size={19} />} />}
+      {insights.sleep.comparison && <p className="insight-caveat" data-testid="text-insight-sleep-pattern">{insights.sleep.comparison}</p>}
+    </section>
+    {dataPoints === 0 && <div className="insight-empty-banner" role="status" data-testid="empty-insights-window"><span><Compass size={17} /></span><div><strong>No daily patterns to compare just yet.</strong><p>These measures need valid entries in this {days}-day window. An unlogged day is not a zero, and it does not count against you.</p></div></div>}
+    <div className="insight-section-head"><div><span className="well-eyebrow">AREAS OF YOUR RECORD</span><h2>One view, many rhythms</h2><p>{dataPoints} valid daily values across the areas you chose to log.</p></div></div>
+    <div className="insight-area-grid" data-testid="grid-insight-areas">
+      {areas.map((area, index) => <article className={`insight-area insight-area-${area.id} ${index === 0 ? 'insight-area-featured' : ''}`} key={area.id} data-testid={`card-insight-${area.id}`}>
+        <div className="insight-area-top"><span className="insight-area-icon">{area.icon}</span><span className="well-overline">{area.kicker}</span></div>
+        <h3>{area.title}</h3>
+        <div className="insight-area-stat" data-testid={`text-insight-value-${area.id}`}>{area.value ?? 'No notes yet'}</div>
+        <p className="insight-area-detail">{area.detail}</p>
+        <InsightChart points={area.series} metric={area.metric} days={days} />
+        <p className="insight-area-note">{area.note}</p>
+        {area.series.every((point) => point.value === null) && <span className="insight-no-data">No valid entries in this window</span>}
+      </article>)}
+    </div>
+    <p className="insight-data-note"><span className="insight-note-stamp">A NOTE ON THE DATA</span> Empty days are not zero data. Charts leave them blank, and summaries use only valid saved entries. These patterns are observations—not explanations, predictions, or medical advice.</p>
+    <section className="insight-focus" data-testid="card-recommended-focus">
+      <div><span className="well-overline">NEXT WEEK’S FOCUS</span><h2>{insights.recommendedFocus.title}</h2><p>Choose this only if it feels useful. Your record is here to support curiosity, not create a new obligation.</p></div>
+      <Link href={insights.recommendedFocus.href} className="well-btn">{insights.recommendedFocus.actionLabel}<ArrowRight size={15} /></Link>
+    </section>
   </>;
 }
 

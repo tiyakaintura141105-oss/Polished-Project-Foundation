@@ -355,7 +355,7 @@ router.delete("/wellness/entries/:entryKey", requireAuth, async (req, res): Prom
       eq(wellnessEntriesTable.clerkUserId, userId),
       eq(wellnessEntriesTable.entryKey, params.data.entryKey),
     ))
-    .returning({ kind: wellnessEntriesTable.kind });
+    .limit(1);
   if (!entry) {
     res.status(404).json({ error: "Entry not found." });
     return;
