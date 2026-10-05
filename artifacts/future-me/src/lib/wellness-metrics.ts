@@ -496,24 +496,77 @@ export function feelingSleepPattern(
 }
 
 export function cycleSummary(entries: WellnessEntry[], today = localDay()) {
-  const periods = entriesOfKind(entries, "period")
-    .filter((entry) => entry.date <= today)
-    .sort((a, b) => b.date.localeCompare(a.date));
-  const latest = periods[0];
-  if (!latest) return { cycleDay: null, estimatedNextPeriod: null, history: periods };
-  const cycleIntervals = periods.slice(0, 4).slice(1).map((entry, index) =>
-    dayDifference(entry.date, periods[index].date),
-  ).filter((days) => days >= 15 && days <= 90);
-  const explicitLength = objectData(latest).cycleLength;
-  const cycleLength = typeof explicitLength === "number" && explicitLength >= 15 && explicitLength <= 90
-    ? explicitLength
-    : cycleIntervals.length
-      ? Math.round(cycleIntervals.reduce((sum, days) => sum + days, 0) / cycleIntervals.length)
+  const through = validCalendarDay(today) ? today : localDay();
+  const recordsByStart = new Map<
+    string,
+    { entry: WellnessEntry; cycleLength: number | null }
+  >();
+  for (const entry of entriesOfKind(entries, "period")) {
+    const data = objectData(entry);
+    const startDate = validCalendarDay(data.startDate)
+      ? data.startDate
+      : validCalendarDay(entry.date)
+        ? entry.date
+        : null;
+    if (!startDate || startDate > through) continue;
+    const previous = recordsByStart.get(startDate);
+    if (previous && previous.entry.updatedAt > entry.updatedAt) continue;
+    const cycleLength = typeof data.cycleLength === "number" &&
+        Number.isInteger(data.cycleLength) &&
+        data.cycleLength >= 15 &&
+        data.cycleLength <= 90
+      ? data.cycleLength
       : null;
+    recordsByStart.set(startDate, { entry, cycleLength });
+  }
+  const records = [...recordsByStart.entries()]
+    .map(([startDate, value]) => ({ startDate, ...value }))
+    .sort((left, right) =>
+      right.startDate.localeCompare(left.startDate) ||
+      right.entry.updatedAt.localeCompare(left.entry.updatedAt),
+    );
+  const latest = records[0];
+  if (!latest) {
+    return {
+      cycleDay: null,
+      estimatedNextPeriod: null,
+      estimatedCycleLength: null,
+      estimateSource: null,
+      estimateIsPast: false,
+      recentStartIntervals: [] as number[],
+      history: [] as WellnessEntry[],
+    };
+  }
+  const recentStartIntervals = records
+    .slice(0, 4)
+    .slice(1)
+    .map((older, index) => dayDifference(older.startDate, records[index].startDate))
+    .filter((interval) => interval >= 15 && interval <= 90);
+  const sortedIntervals = [...recentStartIntervals].sort((left, right) => left - right);
+  const middle = Math.floor(sortedIntervals.length / 2);
+  const intervalMedian = sortedIntervals.length === 0
+    ? null
+    : sortedIntervals.length % 2 === 1
+      ? sortedIntervals[middle]
+      : Math.round((sortedIntervals[middle - 1] + sortedIntervals[middle]) / 2);
+  const estimatedCycleLength = latest.cycleLength ?? intervalMedian;
+  const estimateSource = latest.cycleLength !== null
+    ? "recorded" as const
+    : intervalMedian !== null
+      ? "recent-start-intervals" as const
+      : null;
+  const projectedDate = estimatedCycleLength === null
+    ? null
+    : addCalendarDays(latest.startDate, estimatedCycleLength);
+  const estimateIsPast = projectedDate !== null && projectedDate < through;
   return {
-    cycleDay: dayDifference(latest.date, today) + 1,
-    estimatedNextPeriod: cycleLength ? addCalendarDays(latest.date, cycleLength) : null,
-    history: periods,
+    cycleDay: dayDifference(latest.startDate, through) + 1,
+    estimatedNextPeriod: estimateIsPast ? null : projectedDate,
+    estimatedCycleLength,
+    estimateSource,
+    estimateIsPast,
+    recentStartIntervals,
+    history: records.map(({ entry }) => entry),
   };
 }
 
