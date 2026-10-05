@@ -319,3 +319,94 @@
 @media (prefers-reduced-motion: reduce) {
   .wellness *, .wellness *::before, .wellness *::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; scroll-behavior:auto !important; transition-duration:.01ms !important; }
 }
+
+/* Feelings: a private notebook for noticing, not assessing */
+.feelings-top-grid { align-items:stretch; }
+.feeling-checkin-card { position:relative; overflow:hidden; background:linear-gradient(145deg,#fffdf8 0%,#f5f8ee 100%); border-color:#e4e6d4; }
+.feeling-checkin-card::after { content:""; position:absolute; width:220px; height:220px; right:-132px; top:-137px; border:1px solid rgba(157,159,112,.19); border-radius:50%; box-shadow:0 0 0 22px rgba(157,159,112,.035),0 0 0 47px rgba(157,159,112,.025); pointer-events:none; }
+.feeling-checkin-card > * { position:relative; z-index:1; }
+.feeling-checkin-card .well-icon { color:#927f59; background:#f3eddb; }
+.feeling-question { margin:-3px 0 17px; color:#425c4a; font:600 24px/1.2 var(--app-font-display,sans-serif); letter-spacing:-.04em; }
+.feeling-choice-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+.feeling-choice-grid .well-choice { min-height:39px; padding:0 9px; color:#72816d; background:#fbfcf6; border-color:#e5e9d9; transition:transform .16s ease,border-color .16s ease,background-color .16s ease; }
+.feeling-choice-grid .well-choice:hover { transform:translateY(-1px); border-color:#b8c8aa; }
+.feeling-choice-grid .well-choice[aria-pressed="true"] { color:#476849; border-color:#a6bc91; background:#eaf1e2; box-shadow:inset 0 0 0 1px rgba(130,157,107,.08); }
+.feeling-intensity-control { display:grid; grid-template-columns:minmax(0,1fr) 54px; align-items:center; gap:14px; }
+.feeling-intensity-control .well-range { margin:7px 0; accent-color:#738e69; }
+.feeling-intensity-control output { text-align:right; color:#4c7154; font:600 19px var(--app-font-display,sans-serif); }
+.feeling-intensity-control output small { color:#93a08d; font:500 10px var(--app-font-sans,sans-serif); }
+.feeling-checkin-card .well-actions { align-items:center; }
+.feeling-private-note { margin:0; color:#92a094; font-size:9px; line-height:1.6; }
+.feeling-history-card { background:linear-gradient(160deg,rgba(255,255,255,.88),#f1f6ed); }
+.feeling-history-card .well-icon { color:#66836d; background:#e9f0e5; }
+.feeling-history-list { max-height:320px; overflow:auto; padding-right:2px; }
+.feeling-history-row { width:100%; font:inherit; text-align:left; cursor:pointer; transition:background-color .16s ease,border-color .16s ease,transform .16s ease; }
+.feeling-history-row:hover { transform:translateY(-1px); border-color:#b9cdb6; background:#fff; }
+.feeling-history-row > svg { flex:none; color:#91a590; }
+.feeling-history-row.is-selected { border-color:#adc4a9; background:#edf4e9; }
+.feeling-history-row .well-record-main { align-items:flex-start; }
+.feeling-history-row .well-record-main > span:last-child { display:block; min-width:0; }
+.feeling-history-row .well-record-meta { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.feeling-history-filter { display:grid; grid-template-columns:1fr minmax(120px,.8fr); align-items:center; gap:10px; margin-top:13px; padding-top:12px; border-top:1px solid #e4ebdf; }
+.feeling-history-filter label { color:#778a79; font-size:9px; font-weight:650; }
+.feeling-history-filter select { min-width:0; min-height:36px; padding:0 9px; border:1px solid #dce7de; border-radius:9px; color:#43654e; background:#fbfdf9; font-size:10px; }
+.feeling-pattern-section { margin-top:35px; }
+.feeling-pattern-section .well-section-head { margin-bottom:14px; }
+.feeling-pattern-section .well-section-head h2 { margin:7px 0 0; color:#355849; font:600 24px/1.2 var(--app-font-display,sans-serif); letter-spacing:-.04em; }
+.feeling-current-report { margin:-3px 0 14px; padding:11px 13px; border-left:2px solid #a8b893; border-radius:0 10px 10px 0; background:#f6f8f0; color:#627a62; font:500 13px/1.5 var(--app-font-display,sans-serif); }
+.feeling-window-label { padding:7px 9px; border:1px solid #e2e9da; border-radius:8px; color:#8b9984; background:#f5f8ef; font-size:8px; font-weight:700; letter-spacing:.1em; }
+.feeling-insights-grid { align-items:stretch; }
+.feeling-trend-card { background:linear-gradient(150deg,#fbfcf5,#f1f6ea); border-color:#e2e9dc; }
+.feeling-trend-card .well-icon { color:#698365; background:#e7efe0; }
+.feeling-trend-chart { display:flex; align-items:stretch; gap:9px; width:100%; height:177px; padding:11px 4px 2px; }
+.feeling-trend-day { flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:7px; }
+.feeling-trend-value { min-height:11px; color:#70866e; font-size:8px; font-weight:650; }
+.feeling-trend-track { flex:1; width:min(27px,80%); display:flex; align-items:flex-end; overflow:hidden; border-radius:9px 9px 4px 4px; background:rgba(222,232,214,.68); }
+.feeling-trend-track i { display:block; width:100%; min-height:5px; border-radius:inherit; background:linear-gradient(180deg,#a8b98a,#738d69); transition:height .38s cubic-bezier(.2,.7,.25,1); }
+.feeling-trend-day.is-blank .feeling-trend-track { border:1px dashed #d5e1d0; background:rgba(248,250,244,.55); }
+.feeling-trend-day.is-blank .feeling-trend-track i { display:none; }
+.feeling-trend-day small { color:#96a193; font-size:8px; }
+.feeling-average-row { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:8px; padding-top:12px; border-top:1px solid #e2e9dc; color:#879584; font-size:9px; }
+.feeling-average-row strong { color:#557452; font:600 15px var(--app-font-display,sans-serif); }
+.feeling-observations-card { background:#fffdf7; border-color:#ebe5d5; }
+.feeling-observations-card .well-icon { color:#967b54; background:#f4eddd; }
+.feeling-summary-stats { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+.feeling-summary-stats > div { min-width:0; padding:10px 9px; border:1px solid #ece9dc; border-radius:11px; background:#fcfbf5; }
+.feeling-summary-stats span { display:block; color:#8f9987; font-size:8px; line-height:1.4; }
+.feeling-summary-stats strong { display:block; overflow:hidden; margin-top:5px; color:#577151; font:600 14px/1.2 var(--app-font-display,sans-serif); text-overflow:ellipsis; white-space:nowrap; }
+.feeling-pattern-copy { margin-top:13px; }
+.feeling-pattern-kicker { display:block; margin:0 0 8px; color:#7b886e; font-size:9px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.feeling-patterns-list { display:grid; gap:8px; }
+.feeling-patterns-list .well-callout { margin:0; padding:10px 11px; border-left-color:#b7c59d; border-radius:0 9px 9px 0; background:#f4f6eb; color:#75826c; font-size:9px; line-height:1.6; }
+.feeling-pattern-line { display:grid; grid-template-columns:100px minmax(0,1fr); align-items:start; gap:9px; padding:9px 1px; border-bottom:1px solid #efecdf; }
+.feeling-pattern-line strong { color:#687c61; font-size:9px; font-weight:700; }
+.feeling-pattern-line span { color:#879081; font-size:9px; line-height:1.6; }
+.feeling-neutral-observation { margin:2px 0; color:#869181; font-size:9px; line-height:1.6; }
+.feeling-log-coverage { display:grid; gap:6px; margin-top:11px; padding:11px 12px; border:1px solid #eee9db; border-radius:11px; background:#faf9f1; }
+.feeling-log-coverage strong { margin-bottom:1px; color:#77836d; font-size:9px; }
+.feeling-log-coverage span { color:#92998a; font-size:8px; line-height:1.5; }
+.feeling-caution { margin:11px 0 0; color:#92998a; font-size:8px; line-height:1.6; }
+.feeling-insufficient { display:flex; align-items:center; min-height:94px; margin-top:13px; padding:15px; border:1px solid #e5e8d9; border-radius:13px; background:linear-gradient(135deg,#f6f7ed,#f4f6ef); color:#71806d; font:500 13px/1.65 var(--app-font-display,sans-serif); }
+.feeling-connection-row { align-items:center; margin-top:14px; }
+.feeling-connection-row > .feeling-private-note { max-width:260px; }
+.feeling-shortcuts { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+.feeling-shortcuts .well-shortcut { position:relative; min-height:82px; padding:10px; border-color:#e2eadd; background:#f8faf5; }
+.feeling-shortcuts .well-shortcut svg:last-child { position:absolute; top:10px; right:9px; width:12px; height:12px; color:#99aa91; }
+.feeling-shortcuts .well-shortcut span { max-width:100%; padding-right:4px; font-size:9px; line-height:1.4; }
+@media (max-width:760px) {
+  .feeling-pattern-section { margin-top:27px; }
+  .feeling-pattern-section .well-section-head { align-items:flex-start; flex-direction:row; }
+  .feeling-pattern-section .well-section-head h2 { font-size:21px; }
+  .feeling-trend-chart { height:155px; gap:6px; }
+  .feeling-connection-row { gap:11px; }
+  .feeling-connection-row > .feeling-private-note { max-width:none; }
+}
+@media (max-width:420px) {
+  .feeling-choice-grid { grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; }
+  .feeling-choice-grid .well-choice { padding:0 5px; font-size:9px; }
+  .feeling-summary-stats { grid-template-columns:1fr 1fr; }
+  .feeling-summary-stats > div:last-child { grid-column:1/-1; }
+  .feeling-pattern-line { grid-template-columns:1fr; gap:3px; }
+  .feeling-shortcuts { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .feeling-history-filter { grid-template-columns:1fr; gap:6px; }
+}

@@ -524,3 +524,280 @@ export function energyAction(level: 10 | 30 | 50 | 70 | 90): string {
   if (level === 70) return "Choose 15 minutes of movement that feels right for you.";
   return "If you want, take a longer walk, prepare part of a meal, or check in on an experiment.";
 }
+
+export type FeelingMetricComparison = {
+  matchedDays: number;
+  belowAverageDays: number | null;
+  recentAverage: number | null;
+};
+
+export type FeelingPatternSummary = {
+  feeling: string | null;
+  days: number;
+  feelingDays: number;
+  averageIntensity: number | null;
+  trend: WellnessDay[];
+  loggingConsistency: ReturnType<typeof loggingConsistency>;
+  sleep: FeelingMetricComparison;
+  steps: FeelingMetricComparison;
+  energy: FeelingMetricComparison;
+  calories: { daysLogged: number; feelingDaysLogged: number };
+  experiments: { daysLogged: number; feelingDaysLogged: number };
+  period: { daysLogged: number; feelingDaysLogged: number };
+  enoughData: boolean;
+  possiblePatterns: string[];
+};
+
+const supportedFeelings = new Set([
+  "tired",
+  "stressed",
+  "low mood",
+  "energetic",
+  "bloated",
+  "headache",
+  "poor focus",
+  "good",
+  "other",
+]);
+
+function validCalendarDay(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const date = new Date(`${value}T12:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+function metricValuesByDate(
+  entries: WellnessEntry[],
+  kind: WellnessEntryKind,
+  field: string,
+  first: string,
+  through: string,
+  isValid: (value: unknown) => value is number,
+): Map<string, number> {
+  const byDate = new Map<string, { value: number; updatedAt: string }>();
+  for (const entry of entriesOfKind(entries, kind)) {
+    if (entry.date < first || entry.date > through) continue;
+    const value = objectData(entry)[field];
+    if (!isValid(value)) continue;
+    const current = byDate.get(entry.date);
+    if (!current || entry.updatedAt >= current.updatedAt) {
+      byDate.set(entry.date, { value, updatedAt: entry.updatedAt });
+    }
+  }
+  return new Map([...byDate].map(([date, item]) => [date, item.value]));
+}
+
+function compareMetricOnFeelingDays(
+  valuesByDate: Map<string, number>,
+  feelingDates: Set<string>,
+): FeelingMetricComparison {
+  const values = [...valuesByDate.values()];
+  const recentAverage = values.length
+    ? Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10
+    : null;
+  const matchedValues = [...feelingDates]
+    .map((date) => valuesByDate.get(date))
+    .filter((value): value is number => value !== undefined);
+  return {
+    matchedDays: matchedValues.length,
+    belowAverageDays: recentAverage === null
+      ? null
+      : matchedValues.filter((value) => value < recentAverage).length,
+    recentAverage,
+  };
+}
+
+export function feelingPatternSummary(
+  entries: WellnessEntry[],
+  selectedFeeling?: string | null,
+  through = localDay(),
+  days = 7,
+): FeelingPatternSummary {
+  const safeDays = days === 30 ? 30 : 7;
+  const first = addCalendarDays(through, -(safeDays - 1));
+  const feelingEntries = entriesOfKind(entries, "feeling").filter((entry) => {
+    const data = objectData(entry);
+    return entry.date >= first &&
+      entry.date <= through &&
+      supportedFeelings.has(String(data.feeling)) &&
+      typeof data.intensity === "number" &&
+      Number.isInteger(data.intensity) &&
+      data.intensity >= 1 &&
+      data.intensity <= 10;
+  });
+  const latestFeeling = [...feelingEntries].sort(
+    (left, right) =>
+      right.date.localeCompare(left.date) ||
+      right.updatedAt.localeCompare(left.updatedAt),
+  )[0];
+  const requestedFeeling = typeof selectedFeeling === "string" &&
+      supportedFeelings.has(selectedFeeling)
+    ? selectedFeeling
+    : null;
+  const feeling = requestedFeeling ??
+    (latestFeeling ? String(objectData(latestFeeling).feeling) : null);
+
+  const intensityByDate = new Map<string, number[]>();
+  if (feeling) {
+    for (const entry of feelingEntries) {
+      const data = objectData(entry);
+      if (data.feeling !== feeling) continue;
+      const intensities = intensityByDate.get(entry.date) ?? [];
+      intensities.push(data.intensity as number);
+      intensityByDate.set(entry.date, intensities);
+    }
+  }
+  const intensityByDateAverage = new Map(
+    [...intensityByDate].map(([date, intensities]) => [
+      date,
+      intensities.reduce((sum, value) => sum + value, 0) / intensities.length,
+    ]),
+  );
+  const feelingDates = new Set(intensityByDateAverage.keys());
+  const dailyIntensities = [...intensityByDateAverage.values()];
+  const averageIntensity = dailyIntensities.length
+    ? Math.round(
+        (dailyIntensities.reduce((sum, value) => sum + value, 0) /
+          dailyIntensities.length) * 10,
+      ) / 10
+    : null;
+
+  const sleepByDate = metricValuesByDate(
+    entries,
+    "sleep",
+    "durationMinutes",
+    first,
+    through,
+    (value): value is number =>
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 1 &&
+      value <= 1_440,
+  );
+  const stepsByDate = metricValuesByDate(
+    entries,
+    "steps",
+    "count",
+    first,
+    through,
+    (value): value is number =>
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 150_000,
+  );
+  const energyByDate = metricValuesByDate(
+    entries,
+    "energy",
+    "level",
+    first,
+    through,
+    (value): value is number =>
+      typeof value === "number" && [10, 30, 50, 70, 90].includes(value),
+  );
+  const sleep = compareMetricOnFeelingDays(sleepByDate, feelingDates);
+  const steps = compareMetricOnFeelingDays(stepsByDate, feelingDates);
+  const energy = compareMetricOnFeelingDays(energyByDate, feelingDates);
+
+  const calorieDays = metricValuesByDate(
+    entries,
+    "calories",
+    "count",
+    first,
+    through,
+    (value): value is number =>
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      value >= 0 &&
+      value <= 20_000,
+  );
+  const experimentDays = new Set(
+    entriesOfKind(entries, "experiment-checkin")
+      .filter((entry) => entry.date >= first && entry.date <= through)
+      .filter((entry) => {
+        const data = objectData(entry);
+        return typeof data.experimentKey === "string" &&
+          data.experimentKey.length > 0 &&
+          typeof data.completed === "boolean" &&
+          typeof data.rating === "number" &&
+          Number.isInteger(data.rating) &&
+          data.rating >= 1 &&
+          data.rating <= 5;
+      })
+      .map((entry) => entry.date),
+  );
+
+  const periodDates = new Set<string>();
+  for (const entry of entriesOfKind(entries, "period")) {
+    const data = objectData(entry);
+    const start = validCalendarDay(data.startDate) ? data.startDate : entry.date;
+    if (!validCalendarDay(start)) continue;
+    const end = validCalendarDay(data.endDate) && data.endDate >= start
+      ? data.endDate
+      : start;
+    const overlapStart = start > first ? start : first;
+    const overlapEnd = end < through ? end : through;
+    if (overlapStart > overlapEnd) continue;
+    for (
+      let date = overlapStart;
+      date <= overlapEnd;
+      date = addCalendarDays(date, 1)
+    ) {
+      periodDates.add(date);
+    }
+  }
+
+  const possiblePatterns = [
+    { label: "sleep", metric: sleep },
+    { label: "step totals", metric: steps },
+    { label: "logged energy levels", metric: energy },
+  ]
+    .filter(({ metric }) =>
+      metric.matchedDays >= 2 &&
+      metric.belowAverageDays !== null &&
+      metric.belowAverageDays >= 2 &&
+      metric.belowAverageDays / metric.matchedDays >= 0.5,
+    )
+    .map(({ label, metric }) =>
+      `Lower logged ${label} may be associated with how you reported feeling. Your logs show a pattern worth watching, not a cause (${metric.belowAverageDays} of ${metric.matchedDays} matched days).`,
+    );
+  const hasRepeatedOverlap = [
+    sleep.matchedDays,
+    steps.matchedDays,
+    energy.matchedDays,
+    [...feelingDates].filter((date) => calorieDays.has(date)).length,
+    [...feelingDates].filter((date) => experimentDays.has(date)).length,
+    [...feelingDates].filter((date) => periodDates.has(date)).length,
+  ].some((matchedDays) => matchedDays >= 2);
+
+  return {
+    feeling,
+    days: safeDays,
+    feelingDays: feelingDates.size,
+    averageIntensity,
+    trend: Array.from({ length: safeDays }, (_, index) => {
+      const date = addCalendarDays(first, index);
+      return { date, value: intensityByDateAverage.get(date) ?? null };
+    }),
+    loggingConsistency: loggingConsistency(entries, safeDays === 30 ? 30 : 7, through),
+    sleep,
+    steps,
+    energy,
+    calories: {
+      daysLogged: calorieDays.size,
+      feelingDaysLogged: [...feelingDates].filter((date) => calorieDays.has(date)).length,
+    },
+    experiments: {
+      daysLogged: experimentDays.size,
+      feelingDaysLogged: [...feelingDates].filter((date) => experimentDays.has(date)).length,
+    },
+    period: {
+      daysLogged: periodDates.size,
+      feelingDaysLogged: [...feelingDates].filter((date) => periodDates.has(date)).length,
+    },
+    enoughData: feelingDates.size >= 3 && hasRepeatedOverlap,
+    possiblePatterns,
+  };
+}

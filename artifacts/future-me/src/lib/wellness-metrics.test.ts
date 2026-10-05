@@ -8,6 +8,7 @@ import {
   cycleSummary,
   dailySeries,
   energyAction,
+  feelingPatternSummary,
   feelingSleepPattern,
   futureMeProjection,
   habitProjection,
@@ -385,4 +386,156 @@ test("logging consistency counts unique logged calendar days and energy suggesti
   assert.match(energyAction(70), /15/i);
   assert.match(energyAction(90), /comfortable|movement|walk|experiment/i);
   assert.equal(localDay(new Date(2026, 9, 4)), "2026-10-04");
+});
+
+test("feeling pattern summaries stay sparse and keep missing days blank", () => {
+  const empty = feelingPatternSummary([], undefined, "2026-10-04");
+  assert.equal(empty.feeling, null);
+  assert.equal(empty.feelingDays, 0);
+  assert.equal(empty.averageIntensity, null);
+  assert.equal(empty.enoughData, false);
+  assert.deepEqual(empty.trend.map((day) => day.value), Array(7).fill(null));
+  assert.deepEqual(empty.sleep, {
+    matchedDays: 0,
+    belowAverageDays: null,
+    recentAverage: null,
+  });
+
+  const oneCheckIn = entry("feeling", "2026-10-04", {
+    feeling: "tired",
+    intensity: 6,
+  });
+  const sparse = feelingPatternSummary([oneCheckIn], undefined, "2026-10-04");
+  assert.equal(sparse.feeling, "tired");
+  assert.equal(sparse.feelingDays, 1);
+  assert.equal(sparse.averageIntensity, 6);
+  assert.equal(sparse.trend[6].value, 6);
+  assert.equal(sparse.enoughData, false);
+  assert.deepEqual(sparse.possiblePatterns, []);
+});
+
+test("three feeling days without any matched lifestyle records remain insufficient", () => {
+  const entries = [
+    entry("feeling", "2026-10-01", { feeling: "stressed", intensity: 4 }, 1),
+    entry("feeling", "2026-10-02", { feeling: "stressed", intensity: 5 }, 2),
+    entry("feeling", "2026-10-04", { feeling: "stressed", intensity: 6 }, 3),
+  ];
+  const summary = feelingPatternSummary(entries, "stressed", "2026-10-04");
+  assert.equal(summary.feelingDays, 3);
+  assert.equal(summary.enoughData, false);
+  assert.deepEqual(summary.possiblePatterns, []);
+  assert.equal(summary.sleep.matchedDays, 0);
+  assert.equal(summary.loggingConsistency.loggedDays, 3);
+});
+
+test("feeling summaries support the 30-day window without filling unlogged dates", () => {
+  const summary = feelingPatternSummary([
+    entry("feeling", "2026-09-05", { feeling: "good", intensity: 8 }, 1),
+    entry("feeling", "2026-10-04", { feeling: "good", intensity: 7 }, 2),
+  ], "good", "2026-10-04", 30);
+  assert.equal(summary.days, 30);
+  assert.equal(summary.trend.length, 30);
+  assert.equal(summary.trend[0].date, "2026-09-05");
+  assert.equal(summary.trend[0].value, 8);
+  assert.equal(summary.trend[28].value, null);
+  assert.equal(summary.trend[29].value, 7);
+  assert.deepEqual(summary.loggingConsistency, {
+    loggedDays: 2,
+    totalDays: 30,
+    percent: 7,
+  });
+});
+
+test("feeling comparisons use actual matched days and label repeated overlap as non-causal", () => {
+  const entries = [
+    entry("feeling", "2026-09-28", { feeling: "tired", intensity: 7 }, 1),
+    entry("feeling", "2026-09-30", { feeling: "tired", intensity: 5 }, 2),
+    entry("feeling", "2026-10-01", { feeling: "tired", intensity: 6 }, 3),
+    entry("feeling", "2026-10-02", { feeling: "good", intensity: 4 }, 4),
+    entry("sleep", "2026-09-28", { durationMinutes: 360 }, 5),
+    entry("sleep", "2026-09-29", { durationMinutes: 480 }, 6),
+    entry("sleep", "2026-09-30", { durationMinutes: 400 }, 7),
+    entry("sleep", "2026-10-01", { durationMinutes: 600 }, 8),
+    entry("steps", "2026-09-28", { count: 6_000 }, 9),
+    entry("steps", "2026-09-29", { count: 8_000 }, 10),
+    entry("steps", "2026-09-30", { count: 4_000 }, 11),
+    entry("steps", "2026-10-01", { count: 7_000 }, 12),
+    entry("energy", "2026-09-28", { level: 10, action: "Rest", completed: true }, 13),
+    entry("energy", "2026-09-29", { level: 70, action: "Walk", completed: true }, 14),
+    entry("energy", "2026-09-30", { level: 30, action: "Stretch", completed: false }, 15),
+    entry("energy", "2026-10-01", { level: 90, action: "Walk", completed: true }, 16),
+    entry("calories", "2026-09-28", { count: 1_800 }, 17),
+    entry("calories", "2026-09-30", { count: 2_000 }, 18),
+    entry("calories", "2026-10-02", { count: 1_900 }, 19),
+    entry("experiment-checkin", "2026-09-30", {
+      experimentKey: "walk",
+      completed: true,
+      rating: 4,
+    }, 20),
+    entry("period", "2026-09-30", {
+      startDate: "2026-09-30",
+      endDate: "2026-10-01",
+    }, 21),
+  ];
+  const summary = feelingPatternSummary(entries, "tired", "2026-10-04");
+
+  assert.equal(summary.feelingDays, 3);
+  assert.equal(summary.averageIntensity, 6);
+  assert.deepEqual(
+    summary.trend.map((day) => day.value),
+    [7, null, 5, 6, null, null, null],
+  );
+  assert.deepEqual(summary.sleep, {
+    matchedDays: 3,
+    belowAverageDays: 2,
+    recentAverage: 460,
+  });
+  assert.equal(summary.steps.matchedDays, 3);
+  assert.equal(summary.steps.belowAverageDays, 2);
+  assert.equal(summary.energy.matchedDays, 3);
+  assert.equal(summary.energy.belowAverageDays, 2);
+  assert.equal(summary.calories.daysLogged, 3);
+  assert.equal(summary.calories.feelingDaysLogged, 2);
+  assert.equal(summary.experiments.daysLogged, 1);
+  assert.equal(summary.experiments.feelingDaysLogged, 1);
+  assert.equal(summary.period.daysLogged, 2);
+  assert.equal(summary.period.feelingDaysLogged, 2);
+  assert.equal(summary.loggingConsistency.loggedDays, 5);
+  assert.equal(summary.enoughData, true);
+  assert.equal(summary.possiblePatterns.length, 3);
+  assert.ok(summary.possiblePatterns.every((pattern) =>
+    pattern.includes("may be associated") &&
+    pattern.includes("pattern worth watching") &&
+    !pattern.includes("caused"),
+  ));
+});
+
+test("feeling summaries deduplicate dates and ignore invalid or out-of-window values", () => {
+  const entries = [
+    entry("feeling", "2026-10-04", { feeling: "other", intensity: 4 }, 1),
+    entry("feeling", "2026-10-04", { feeling: "other", intensity: 8 }, 2),
+    entry("feeling", "2026-10-03", { feeling: "other", intensity: 11 }, 3),
+    entry("feeling", "2026-09-26", { feeling: "other", intensity: 6 }, 4),
+    entry("feeling", "2026-10-02", { feeling: "not-a-feeling", intensity: 6 }, 5),
+    entry("sleep", "2026-10-04", { durationMinutes: 0 }, 6),
+    entry("steps", "2026-10-04", { count: -1 }, 7),
+    entry("energy", "2026-10-04", { level: 25, action: "Invalid", completed: true }, 8),
+    entry("calories", "2026-10-04", { count: 20_001 }, 9),
+    entry("experiment-checkin", "2026-10-04", {
+      experimentKey: "",
+      completed: true,
+      rating: 6,
+    }, 10),
+  ];
+  const summary = feelingPatternSummary(entries, "other", "2026-10-04");
+  assert.equal(summary.feelingDays, 1);
+  assert.equal(summary.averageIntensity, 6);
+  assert.equal(summary.trend[6].value, 6);
+  assert.equal(summary.sleep.matchedDays, 0);
+  assert.equal(summary.steps.matchedDays, 0);
+  assert.equal(summary.energy.matchedDays, 0);
+  assert.equal(summary.calories.daysLogged, 0);
+  assert.equal(summary.experiments.daysLogged, 0);
+  assert.equal(summary.period.daysLogged, 0);
+  assert.equal(summary.enoughData, false);
 });

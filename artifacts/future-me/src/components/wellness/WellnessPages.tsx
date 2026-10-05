@@ -10,7 +10,7 @@ import type { FeelingWellnessData, Profile, WellnessEntry, WellnessEntryInput } 
 import { useWellness } from './use-wellness';
 import {
   calculateCalorieTarget, calculateStepGoal, dailySeries, entryForDay,
-  energyAction, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress,
+  energyAction, feelingPatternSummary, futureMeProjection, localDay, loggingConsistency, sleepSummary, stepProgress,
 } from '@/lib/wellness-metrics';
 import './wellness.css';
 
@@ -117,7 +117,7 @@ function WellBody({ pageId, profile, wellness }: { pageId: WellnessPageId; profi
     case 'experiments': content = <ExperimentsPage {...wellness} />; break;
     case 'sleep': content = <SleepPage profile={profile} {...wellness} />; break;
     case 'five-minute': content = <FiveMinutePage {...wellness} />; break;
-    case 'feelings': content = <FeelingsPage {...wellness} />; break;
+    case 'feelings': content = <FeelingsPage profile={profile} {...wellness} />; break;
     case 'periods': content = <PeriodsPage {...wellness} />; break;
     case 'history': content = <HistoryPage {...wellness} />; break;
     case 'insights': content = <InsightsPage {...wellness} />; break;
@@ -681,60 +681,151 @@ const feelingOptions: { value: FeelingWellnessData['feeling']; title: string }[]
   { value: 'headache', title: 'Headache' },
   { value: 'poor focus', title: 'Poor focus' },
   { value: 'good', title: 'Good' },
-  { value: 'other', title: 'Something else' },
+  { value: 'other', title: 'Other' },
 ];
-function FeelingsPage({ entries, save, isSaving }: ReturnType<typeof useWellness>) {
+function FeelingsPage({ profile, entries, save, isSaving }: ReturnType<typeof useWellness> & { profile: Profile }) {
   const [feeling, setFeeling] = useState<FeelingWellnessData['feeling'] | ''>('');
   const [intensity, setIntensity] = useState(5);
   const [note, setNote] = useState('');
+  const [selectedFeeling, setSelectedFeeling] = useState('');
+  const summary = feelingPatternSummary(entries, selectedFeeling || undefined, todayISO(), 7);
+  const loggedFeelings = sortNewest(entries.filter((entry) => entry.kind === 'feeling'));
+  const recentFeelings = loggedFeelings.slice(0, 8);
+  const savedFeelingLabels = [...new Set(loggedFeelings.map((entry) => String(readData<FeelingData>(entry)?.feeling ?? '')))]
+    .filter((value) => feelingOptions.some((option) => option.value === value));
+  const inspectedFeeling = summary.feeling;
+  const selectedHistory = selectedFeeling || inspectedFeeling || '';
+  const reportedToday = !!inspectedFeeling && loggedFeelings.some((entry) =>
+    entry.date === todayISO() && readData<FeelingData>(entry)?.feeling === inspectedFeeling,
+  );
+  const recentFeelingReport = inspectedFeeling
+    ? reportedToday
+      ? `You reported feeling ${inspectedFeeling} today.`
+      : `You reported feeling ${inspectedFeeling} on ${summary.feelingDays} ${summary.feelingDays === 1 ? 'day' : 'days'} in the last seven days.`
+    : 'Save a check-in to compare it with your recent notes.';
   const saveFeeling = (event: FormEvent) => {
     event.preventDefault();
     if (!feeling) return;
-    save(makeInput(dateKey(`feeling-${Date.now()}`), 'feeling', todayISO(), { feeling, intensity, note: note.trim() || undefined }), 'Your check-in has been added to your personal record.');
-    setNote('');
+    const savedFeeling = feeling;
+    save(
+      makeInput(dateKey(`feeling-${Date.now()}`), 'feeling', todayISO(), { feeling: savedFeeling, intensity, note: note.trim() || undefined }),
+      'Your check-in has been added to your personal record.',
+      () => {
+        setSelectedFeeling(savedFeeling);
+        setNote('');
+      },
+    );
   };
-  const loggedFeelings = sortNewest(entries.filter((entry) => entry.kind === 'feeling'));
-  const sortedCounts = new Map<string, number>();
-  loggedFeelings.forEach((entry) => {
-    const value = String((entry.data as WellnessData).feeling);
-    sortedCounts.set(value, (sortedCounts.get(value) ?? 0) + 1);
-  });
-  const mostLogged = [...sortedCounts.entries()].sort((a, b) => b[1] - a[1])[0];
-  const feelingDates = new Set(loggedFeelings.map((entry) => entry.date));
-  const sleepDays = new Set(entries.filter((entry) => entry.kind === 'sleep').map((entry) => entry.date));
-  const sharedDays = [...feelingDates].filter((date) => sleepDays.has(date)).length;
-  const recent = loggedFeelings.slice(0, 6);
+  const metricSummary = (label: string, metric: typeof summary.sleep, unit: string) => {
+    if (metric.matchedDays < 2 || metric.belowAverageDays === null || metric.recentAverage === null) return null;
+    const average = unit === 'minutes'
+      ? `${Math.floor(Math.round(metric.recentAverage) / 60)}h ${Math.round(metric.recentAverage) % 60}m`
+      : Math.round(metric.recentAverage).toLocaleString();
+    const observation = label === 'sleep'
+      ? `On ${metric.belowAverageDays} of ${metric.matchedDays} days you reported ${inspectedFeeling}, your logged sleep duration was below your recent average (${average}).`
+      : label === 'step totals'
+        ? `On ${metric.belowAverageDays} of ${metric.matchedDays} days you reported ${inspectedFeeling}, your step total was below your recent average (${average}).`
+        : `On ${metric.belowAverageDays} of ${metric.matchedDays} days you reported ${inspectedFeeling}, your selected energy level was below your recent average (${average}).`;
+    return <div className="feeling-pattern-line" key={label} data-testid={`text-feeling-pattern-${label.replaceAll(' ', '-')}`}>
+      <strong>{label}</strong><span>{observation}</span>
+    </div>;
+  };
+  const repeatedOverlap = (days: number, label: string) => days >= 2
+    ? <div className="feeling-pattern-line" key={label} data-testid={`text-feeling-overlap-${label.replaceAll(' ', '-')}`}>
+        <strong>{label}</strong><span>These entries were saved on {days} of the {summary.feelingDays} days you reported feeling {inspectedFeeling}.</span>
+      </div>
+    : null;
   return <>
-    <PageHeading eyebrow="A CHECK-IN WITH YOURSELF" title={<>How are you,<br /><em>right now?</em></>} copy="Name what is present without needing to explain it. Your notes belong to you, and an association is only a coincidence worth noticing." />
-    <div className="well-grid two">
-      <Card>
-        <CardHeading label="Make a feelings note" icon={<Heart size={17} />} />
+    <PageHeading eyebrow="A CHECK-IN WITH YOURSELF" title={<>Why Do I Feel<br /><em>Like This?</em></>} copy="A private place to notice what is here, and what your own recent notes share the page with. Patterns are observations, never explanations." />
+    <div className="well-grid two feelings-top-grid">
+      <Card className="feeling-checkin-card">
+        <CardHeading label="A note for today" icon={<Heart size={17} />} />
+        <h2 className="feeling-question">How are you feeling?</h2>
         <form className="well-form" onSubmit={saveFeeling}>
-          <span className="well-label">What feels closest today?</span>
-          <div className="well-choice-row" role="group" aria-label="Choose a feeling">
+          <span className="well-label">Choose the words that fit best</span>
+          <div className="well-choice-row feeling-choice-grid" role="group" aria-label="Choose one feeling">
             {feelingOptions.map((option) => <button type="button" key={option.value} className="well-choice" aria-pressed={feeling === option.value} onClick={() => setFeeling(option.value)} data-testid={`button-feeling-${option.value.replaceAll(' ', '-')}`}>{option.title}</button>)}
           </div>
-          <Field label={`Intensity · ${intensity} of 10`}><input className="well-range" type="range" min="1" max="10" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))} aria-label={`Feeling intensity ${intensity} of 10`} data-testid="input-feeling-intensity" /></Field>
-          <Field label="A note for yourself (optional)"><textarea maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Anything you want to remember about this moment…" data-testid="input-feeling-note" /></Field>
-          <div className="well-actions"><button className="well-btn" type="submit" disabled={!feeling || isSaving} data-testid="button-save-feeling"><Check size={14} /> Save this check-in</button></div>
+          <Field label="Intensity, from 1 to 10"><div className="feeling-intensity-control"><input id="input-feeling-intensity" className="well-range" type="range" min="1" max="10" step="1" value={intensity} onChange={(event) => setIntensity(Number(event.target.value))} aria-label="Feeling intensity from 1 to 10" aria-valuetext={`${intensity} out of 10`} data-testid="input-feeling-intensity" /><output htmlFor="input-feeling-intensity" data-testid="text-feeling-intensity">{intensity}<small> / 10</small></output></div></Field>
+          <Field label="A private note (optional)"><textarea maxLength={1000} value={note} onChange={(event) => setNote(event.target.value)} placeholder="Anything you want to remember about this moment…" data-testid="input-feeling-note" /></Field>
+          <div className="well-actions"><button className="well-btn" type="submit" disabled={!feeling || isSaving} data-testid="button-save-feeling"><Check size={14} /> {isSaving ? 'Saving your note…' : 'Save this check-in'}</button><span className="feeling-private-note">Only what you choose to record appears here.</span></div>
         </form>
       </Card>
-      <Card>
-        <CardHeading label="Your own patterns" icon={<Compass size={17} />} />
-        {loggedFeelings.length < 3 ? <div className="well-callout"><strong>A low-data space. </strong>After a few check-ins, you can notice what else was happening on the same days. We won’t infer a cause from too little information.</div> : <>
-          <div className="well-metric-box"><span>Most noted in your {loggedFeelings.length} feeling logs</span><strong>{mostLogged ? titleCase(mostLogged[0]) : '—'}{mostLogged && <small style={{ fontSize: 11, color: '#819388' }}> · {mostLogged[1]} times</small>}</strong></div>
-          {sharedDays >= 3
-            ? <div className="well-callout" style={{ marginTop: 13 }}><strong>Just an association: </strong>you logged both sleep and a feeling on {sharedDays} of the same days. This overlap does not tell us whether one affected the other.</div>
-            : <div className="well-callout" style={{ marginTop: 13 }}>There are not yet three days with both a sleep and feeling note. We’ll keep the interpretation open.</div>}
-        </>}
-        <p className="well-note">Feeling counts show only what you chose to name. They are not a diagnosis, score, or judgement.</p>
+      <Card className="feeling-history-card">
+        <CardHeading label="Saved feeling history" icon={<History size={17} />} />
+        {recentFeelings.length ? <div className="well-record-list feeling-history-list">
+          {recentFeelings.map((entry) => {
+            const data = readData<FeelingData>(entry);
+            if (!data) return null;
+            const active = selectedHistory === data.feeling;
+            return <button className={`well-record feeling-history-row ${active ? 'is-selected' : ''}`} type="button" key={entry.key} aria-pressed={active} aria-label={`Inspect ${titleCase(data.feeling)} pattern recorded ${fmtDate(entry.date)}`} onClick={() => setSelectedFeeling(data.feeling)} data-testid={`button-inspect-feeling-${entry.id}`}>
+              <span className="well-record-main"><span className="well-record-icon"><Heart size={15} /></span><span><span className="well-record-title">{titleCase(data.feeling)} · {data.intensity}/10</span><span className="well-record-meta">{fmtDate(entry.date)}{data.note ? ` · ${data.note}` : ''}</span></span></span><ArrowRight size={15} />
+            </button>;
+          })}
+        </div> : <Empty title="Your first note can start here" copy="Saved check-ins will gather here in your private record." icon={<Heart size={18} />} />}
+        {savedFeelingLabels.length > 1 && <div className="feeling-history-filter"><label htmlFor="feeling-pattern-select">Inspect a saved feeling</label><select id="feeling-pattern-select" value={selectedHistory} onChange={(event) => setSelectedFeeling(event.target.value)} data-testid="select-feeling-pattern">
+          {savedFeelingLabels.map((label) => <option key={label} value={label}>{titleCase(label)}</option>)}
+        </select></div>}
       </Card>
     </div>
-    <section className="well-section"><div className="well-section-head"><div><span className="well-eyebrow">RECENT CHECK-INS</span><h2>What you named</h2></div></div>
-      {recent.length ? <div className="well-record-list">{recent.map((entry) => {
-        const data = readData<FeelingData>(entry)!;
-        return <div className="well-record" key={entry.key}><div className="well-record-main"><span className="well-record-icon"><Heart size={15} /></span><div><div className="well-record-title">{titleCase(data.feeling)} · {data.intensity}/10</div><div className="well-record-meta">{fmtDate(entry.date)}{data.note ? ` · ${data.note}` : ''}</div></div></div></div>;
-      })}</div> : <Empty title="A place to begin, whenever you like" copy="Your check-ins will stay in your own words. Nothing is assumed before your first note." icon={<Heart size={18} />} />}
+    <section className="well-section feeling-pattern-section">
+      <div className="well-section-head"><div><span className="well-eyebrow">A LOOK AT YOUR OWN NOTES</span><h2>{inspectedFeeling ? `${titleCase(inspectedFeeling)} · recent pattern` : 'Your recent pattern'}</h2></div><span className="feeling-window-label">LAST SEVEN DAYS</span></div>
+      <p className="feeling-current-report" data-testid="text-feeling-current-report">{recentFeelingReport}</p>
+      <div className="well-grid two feeling-insights-grid">
+        <Card className="feeling-trend-card">
+          <CardHeading label="Intensity over seven days" icon={<Activity size={17} />} />
+          <div className="feeling-trend-chart" role="img" aria-label={`Seven-day intensity trend for ${inspectedFeeling ? titleCase(inspectedFeeling) : 'your selected feeling'}. Blank days mean no matching feeling was saved.`} data-testid="chart-feeling-intensity">
+            {summary.trend.map((point) => <div key={point.date} className={`feeling-trend-day ${point.value === null ? 'is-blank' : ''}`} title={`${fmtDate(point.date)}: ${point.value === null ? 'no matching entry' : `${point.value.toFixed(1).replace(/\.0$/, '')} out of 10`}`} data-testid={`feeling-trend-day-${point.date}`}>
+              <span className="feeling-trend-value">{point.value === null ? '' : point.value.toFixed(1).replace(/\.0$/, '')}</span>
+              <span className="feeling-trend-track"><i style={{ height: point.value === null ? '0%' : `${point.value * 10}%` }} /></span>
+              <small>{new Intl.DateTimeFormat('en', { weekday: 'narrow' }).format(new Date(`${point.date}T12:00:00`))}</small>
+            </div>)}
+          </div>
+          <div className="feeling-average-row"><span>Average intensity on {summary.feelingDays} {summary.feelingDays === 1 ? 'day' : 'days'} recorded</span><strong>{summary.averageIntensity === null ? '—' : `${summary.averageIntensity}/10`}</strong></div>
+          <p className="well-note">Only saved entries appear as marks. Missing days stay blank, not zero.</p>
+        </Card>
+        <Card className="feeling-observations-card">
+          <CardHeading label="What these notes share the page with" icon={<Compass size={17} />} />
+          <div className="feeling-summary-stats" data-testid="summary-feeling-coverage">
+            <div><span>Feeling days</span><strong>{summary.feelingDays} / 7</strong></div>
+            <div><span>Days with any saved log</span><strong>{summary.loggingConsistency.loggedDays} / 7</strong></div>
+            <div><span>Selected feeling</span><strong>{inspectedFeeling ? titleCase(inspectedFeeling) : '—'}</strong></div>
+          </div>
+          {summary.enoughData ? <div className="feeling-pattern-copy" data-testid="summary-feeling-patterns">
+            {summary.possiblePatterns.length > 0 && <strong className="feeling-pattern-kicker">Possible pattern to watch</strong>}
+            <div className="feeling-patterns-list">
+              {summary.possiblePatterns.map((pattern, index) => <p className="well-callout" key={`${index}-${pattern}`} data-testid={`text-possible-pattern-${index}`}>{pattern}</p>)}
+              {metricSummary('sleep', summary.sleep, 'minutes')}
+              {metricSummary('step totals', summary.steps, 'steps')}
+              {metricSummary('logged energy levels', summary.energy, 'levels')}
+              {repeatedOverlap(summary.calories.feelingDaysLogged, 'calorie logging')}
+              {repeatedOverlap(summary.experiments.feelingDaysLogged, 'experiment check-ins')}
+              {profile.sex === 'female' && repeatedOverlap(summary.period.feelingDaysLogged, 'period notes')}
+              {!summary.possiblePatterns.length && summary.sleep.matchedDays < 2 && summary.steps.matchedDays < 2 && summary.energy.matchedDays < 2 && summary.calories.feelingDaysLogged < 2 && summary.experiments.feelingDaysLogged < 2 && (profile.sex !== 'female' || summary.period.feelingDaysLogged < 2) &&
+                <p className="feeling-neutral-observation" data-testid="text-feeling-neutral-summary">Your saved entries do not show a repeated overlap to describe in this window.</p>}
+            </div>
+            <div className="feeling-log-coverage" data-testid="summary-feeling-log-coverage">
+              <strong>Saved notes in this window</strong>
+              <span>Sleep recorded alongside this feeling on {summary.sleep.matchedDays} days · recent logged average {summary.sleep.recentAverage === null ? 'not available' : `${Math.round(summary.sleep.recentAverage).toLocaleString()} minutes`}</span>
+              <span>Step totals alongside this feeling on {summary.steps.matchedDays} days · recent logged average {summary.steps.recentAverage === null ? 'not available' : Math.round(summary.steps.recentAverage).toLocaleString()}</span>
+              <span>Energy levels alongside this feeling on {summary.energy.matchedDays} days · recent logged average {summary.energy.recentAverage === null ? 'not available' : `${summary.energy.recentAverage}/100`}</span>
+              <span>Calorie totals logged on {summary.calories.daysLogged} days · present on {summary.calories.feelingDaysLogged} selected-feeling days</span>
+              <span>Experiment check-ins on {summary.experiments.daysLogged} days · present on {summary.experiments.feelingDaysLogged} selected-feeling days</span>
+              {profile.sex === 'female' && <span>Period notes overlap {summary.period.feelingDaysLogged} selected-feeling days</span>}
+            </div>
+            <p className="feeling-caution">Your logs cannot establish a cause. This is only a record of dates you chose to note.</p>
+          </div> : <div className="feeling-insufficient" role="note" data-testid="text-feeling-insufficient">Keep logging for a few more days and we'll look for patterns.</div>}
+        </Card>
+      </div>
+      <div className="well-grid two feeling-connection-row">
+        <p className="feeling-private-note">Logged amounts are shown as record coverage only, without a target or judgement.</p>
+        <div className="feeling-shortcuts" aria-label="Continue exploring your personal notes">
+          <Link href="/sleep" className="well-shortcut"><Moon size={18} /><span>Sleep Debt Recovery</span><ArrowUpRight size={14} /></Link>
+          <Link href="/five-minute" className="well-shortcut"><Clock3 size={18} /><span>5-Minute Version of Me</span><ArrowUpRight size={14} /></Link>
+          <Link href="/experiments" className="well-shortcut"><Sparkles size={18} /><span>Wellness Experiments</span><ArrowUpRight size={14} /></Link>
+          <Link href="/future-me" className="well-shortcut"><Compass size={18} /><span>Future Me</span><ArrowUpRight size={14} /></Link>
+        </div>
+      </div>
     </section>
   </>;
 }

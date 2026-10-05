@@ -1,0 +1,1 @@
+- [Wellness pattern language](wellness-pattern-language.md) — describe logged overlaps cautiously; never diagnose or claim a cause.
