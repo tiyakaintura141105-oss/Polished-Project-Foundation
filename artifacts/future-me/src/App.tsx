@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ClerkProvider, SignIn, SignUp, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
@@ -20,9 +20,20 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Form } from '@/components/ui/form';
-import { WellnessDashboard, WellnessPage, type WellnessPageId } from '@/components/wellness/WellnessPages';
+import type { WellnessPageId } from '@/components/wellness/WellnessPages';
 import { canAccessCycleTracking } from '@/lib/wellness-metrics';
 import NotFound from '@/pages/not-found';
+
+const WellnessDashboard = lazy(() =>
+  import('@/components/wellness/WellnessPages').then((module) => ({
+    default: module.WellnessDashboard,
+  })),
+);
+const WellnessPage = lazy(() =>
+  import('@/components/wellness/WellnessPages').then((module) => ({
+    default: module.WellnessPage,
+  })),
+);
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -248,7 +259,9 @@ function Dashboard() {
   const profile = profileQuery.data?.profile;
   if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
   return <AppFrame active="/dashboard" showPeriods={canAccessCycleTracking(profile.sex)}>
-    <WellnessDashboard profile={profile} />
+    <Suspense fallback={<LoadingScreen label="Loading your dashboard" />}>
+      <WellnessDashboard profile={profile} />
+    </Suspense>
   </AppFrame>;
 }
 
@@ -261,7 +274,9 @@ function WellnessRoute({ pageId }: { pageId: WellnessPageId }) {
   if (!profileQuery.data?.completed || !profile) return <Redirect to="/onboarding" />;
   if (pageId === 'periods' && !canAccessCycleTracking(profile.sex)) return <Redirect to="/dashboard" />;
   return <AppFrame active={active} showPeriods={canAccessCycleTracking(profile.sex)}>
-    <WellnessPage pageId={pageId} profile={profile} />
+    <Suspense fallback={<LoadingScreen label="Loading your notes" />}>
+      <WellnessPage pageId={pageId} profile={profile} />
+    </Suspense>
   </AppFrame>;
 }
 
