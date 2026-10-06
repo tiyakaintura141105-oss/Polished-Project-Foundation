@@ -75,6 +75,9 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # proxy-addr 2.0.7 is blocked by Replit's package firewall; 2.0.8 is the
+  # latest compatible release for Express 5 and avoids the blocked tarball.
+  proxy-addr: 2.0.8
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"

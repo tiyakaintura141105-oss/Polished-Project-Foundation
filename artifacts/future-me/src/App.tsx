@@ -60,7 +60,7 @@ const appearance = {
   },
   elements: {
     rootBox: 'w-full flex justify-center',
-    cardBox: 'bg-[#fbfdfb] rounded-[24px] w-[440px] max-w-full overflow-hidden shadow-[0_24px_70px_rgba(30,65,54,.1)]',
+    cardBox: 'bg-[#fbfdfb] rounded-[24px] w-full max-w-[440px] overflow-hidden shadow-[0_24px_70px_rgba(30,65,54,.1)]',
     card: '!shadow-none !border-0 !bg-transparent !rounded-none',
     footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
     headerTitle: 'text-[#203c35] font-semibold tracking-tight',
@@ -174,7 +174,7 @@ function SignUpPage() {
   return <AuthFrame><SignUp routing="path" path={`${basePath}/sign-up`} signInUrl={`${basePath}/sign-in`} /></AuthFrame>;
 }
 function AuthFrame({ children }: { children: ReactNode }) {
-  return <main className="auth-frame"><div className="auth-left"><Brand /><div className="auth-art"><div className="auth-moon" /><div className="auth-wave a" /><div className="auth-wave b" /><div className="auth-wave c" /></div><p className="auth-quote display">“A little attention can change the shape of a day.”</p><span className="auth-footnote">A space to meet yourself where you are.</span></div><div className="auth-right"><div className="auth-back"><Link href="/" data-testid="link-auth-home"><ArrowLeft size={15} /> Back to Future Me</Link></div>{children}</div></main>;
+  return <main className="auth-frame"><div className="auth-left"><Brand /><div className="auth-art"><div className="auth-moon" /><div className="auth-wave a" /><div className="auth-wave b" /><div className="auth-wave c" /></div><p className="auth-quote display">“A little attention can change the shape of a day.”</p><span className="auth-footnote">A space to meet yourself where you are.</span></div><div className="auth-right"><div className="auth-back"><Link href="/" data-testid="link-auth-home"><ArrowLeft size={15} /> Back to Future Me</Link></div><div className="auth-widget">{children}</div></div></main>;
 }
 
 function ClerkQueryClientCacheInvalidator() {
